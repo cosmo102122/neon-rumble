@@ -1,2 +1,2 @@
 /*
-  Content-Security-Policy: frame-ancestors 'self' https://sites.google.com https://*.googleusercontent.com https://*.google.com;
+  Content-Security-Policy: frame-ancestors 'self' https://sites.google.com https://*.googleusercontent.com https://*.google.com
