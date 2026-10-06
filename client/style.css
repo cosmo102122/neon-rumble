@@ -6,3 +6,18 @@
 
 /* Keep primary game choices readable on laptop displays. */
 @media(min-width:701px){.join button,.practice button{font-size:14px}.join input{font-size:14px}.control-strip>div{font-size:13px}kbd{font-size:12px}.fighter small{font-size:10px}.stage-caption small{font-size:11px}#networkStatus{font-size:12px}.tools button{font-size:12px}}
+
+
+/* High-impact modern fighter presentation — original styling, optimized for the canvas game. */
+.screen.playing{box-shadow:inset 0 0 0 1px #ffffff12,inset 0 -28px 70px #02060c55}
+.screen.playing::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;border:1px solid #ffffff10;box-shadow:inset 0 0 42px #0008}
+.screen.playing #game{filter:saturate(1.12) contrast(1.05)}
+.screen.playing .hud{z-index:4}
+.screen.playing .fight-footer,.screen.playing .overlay,.screen.playing .connection-banner{z-index:5}
+.name-row strong{text-shadow:0 2px 0 #050914,0 0 15px #000}
+.health{background:linear-gradient(180deg,#24394c,#111b28);box-shadow:0 3px 0 #050914,0 0 14px #0008}
+.health>div{box-shadow:0 0 11px #ff9b5480,inset 0 1px #fff7}
+.second .health>div{box-shadow:0 0 11px #68e6e080,inset 0 1px #fff7}
+.clock>span{text-shadow:0 3px 0 #050914,0 0 18px #000}
+.wins span.won{box-shadow:0 0 8px #ff9b54}
+.second .wins span.won{box-shadow:0 0 8px #68e6e0}
