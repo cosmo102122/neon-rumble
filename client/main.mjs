@@ -9,7 +9,7 @@ function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??
 function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
 let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,listening=null,selected=stored('nr-fighter','kite');if(!FIGHTERS[selected])selected='kite';
 let mode='menu',state=createMatch([selected,'rook']),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
-let serverBase=stored('nr-server','');const params=new URLSearchParams(location.search);const suppliedServer=params.get('server');
+let serverBase=stored('nr-server','');const params=new URLSearchParams(location.search);const embedded=window.self!==window.top||params.get('embed')==='1';if(embedded)document.documentElement.classList.add('embedded');const suppliedServer=params.get('server');
 if(suppliedServer){try{const u=new URL(suppliedServer);if(u.protocol==='https:'){serverBase=u.origin;save('nr-server',serverBase);}}catch{}}
 if(params.get('room'))$('roomInput').value=params.get('room').toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6);
 let savedSession;try{savedSession=JSON.parse(sessionStorage.getItem('nr-session'));}catch{}
