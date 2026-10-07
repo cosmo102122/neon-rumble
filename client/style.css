@@ -21,3 +21,20 @@
 .clock>span{text-shadow:0 3px 0 #050914,0 0 18px #000}
 .wins span.won{box-shadow:0 0 8px #ff9b54}
 .second .wins span.won{box-shadow:0 0 8px #68e6e0}
+
+
+/* Google Sites / iframe embed mode */
+html.embedded body{min-height:0;background:#050a12}
+html.embedded .cabinet{max-width:none;margin:0;padding:0}
+html.embedded .masthead,html.embedded .below{display:none}
+html.embedded .arcade{border:0;box-shadow:none}
+html.embedded .stagebar{height:38px}
+html.embedded .control-strip{padding:10px 12px;gap:10px}
+html.embedded .screen{border-top:1px solid #26354a}
+@media(max-width:700px){
+  html.embedded .cabinet{padding:0}
+  html.embedded .stagebar{height:34px}
+  html.embedded .screen{min-height:560px}
+  html.embedded .screen.playing{min-height:0;aspect-ratio:16/9}
+  html.embedded .control-strip{padding:9px 10px}
+}
