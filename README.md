@@ -17,6 +17,22 @@ A playable browser pixel fighter with a real authoritative Node.js room server, 
 
 Choose a fighter and **Practice vs AI**, or create a room and join it in a second browser tab to test PvP. Both players press **Ready to Fight**. The local URL works on your own computer; it is not a public internet address.
 
+
+## Embed in Google Sites
+
+The Netlify/static client is designed to run inside a Google Sites iframe.
+
+1. Publish the `client/` folder on Netlify.
+2. In Google Sites, choose **Insert → Embed → By URL**.
+3. Use the public game URL with `?embed=1`, for example `https://neonrumble.netlify.app/?embed=1`.
+4. Resize the embed so the 16:9 game area and controls are visible, then publish the Google Site.
+
+The client intentionally does not send an `X-Frame-Options` header or a restrictive `frame-ancestors` CSP, because either can prevent Google Sites from framing the game. The `?embed=1` presentation hides the outer masthead/footer and keeps the game itself prominent.
+
+AI practice works from the static embed. Online room codes still require the Node/WebSocket server. If the full project is deployed to a Node host such as Render, embedding that hosted game URL is the simplest online setup because the page, `/health`, and `/ws` all share one origin.
+
+Embedding does not override browser, school, workplace, or network administrator filtering. If the hosting domain itself is blocked by the device or network, the embed will also be blocked.
+
 ## Play with a friend on a separate internet connection
 
 The provided Sites page runs AI practice immediately. Its hosting supports the game page, but this project’s persistent Node/WebSocket room server needs a separate host. The Node server included here serves **both the webpage and online rooms**, so the simplest setup is to deploy this whole project once:
