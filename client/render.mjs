@@ -65,7 +65,7 @@ export function drawFighter(ctx,f,t,{scale=1,alt=false,ghost=false}={}){
   ctx.restore();
 }
 export class Renderer{
-  constructor(canvas){this.c=canvas;this.ctx=canvas.getContext('2d',{alpha:false});this.ctx.imageSmoothingEnabled=false;this.stage=new Image();this.stage.src='/assets/rooftop.png';this.fx=[];this.lastEvent=0;this.lastMatch=0;this.shake=0;this.flash=0;this.cameraPunch=0;this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;}
+  constructor(canvas){this.c=canvas;this.ctx=canvas.getContext('2d',{alpha:false});this.ctx.imageSmoothingEnabled=false;this.stage=new Image();this.stage.src='./assets/rooftop.png';this.fx=[];this.lastEvent=0;this.lastMatch=0;this.shake=0;this.flash=0;this.cameraPunch=0;this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;}
   events(s,onSound){
     if(s.matchId!==this.lastMatch){this.lastMatch=s.matchId;this.lastEvent=0;this.fx=[];this.flash=0;this.cameraPunch=0;}
     for(const e of s.events){
