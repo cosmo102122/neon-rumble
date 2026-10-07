@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Neon Rumble Embed</title>
+  <meta http-equiv="refresh" content="0; url=./client/embed.html">
+</head>
+<body>
+  <p>Opening Neon Rumble… <a href="./client/embed.html">Continue</a></p>
+  <script>
+    const target = new URL('./client/embed.html', location.href);
+    target.search = location.search;
+    target.hash = location.hash;
+    location.replace(target.href);
+  </script>
+</body>
+</html>
