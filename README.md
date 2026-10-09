@@ -74,7 +74,7 @@ Official deployment references: https://render.com/docs/deploy-node-express-app 
 
 Click **Edit Keys** to change bindings. Changes stay on that browser. Hold crouch and guard to block lows; use standing guard against jumping attacks. There is no chip damage. Air attacks are overheads. Crouch + light performs a low.
 
-Try **light → light → heavy → special** by pressing each next button as the hit connects. Light → heavy and heavy → special also work. Hit cancels only occur on contact, not on a whiff or blocked attack. The chain cannot loop into infinite lights; damage scales down with combo length. The input buffer is eight frames.
+Try **light → light → special** on the ground. For a six-hit aerial route, use **light → light → heavy → jump → air light → air heavy → air special**, pressing each next button as the hit connects. Jump-cancelled air attacks carry you forward, and direction inputs let you steer through air attacks. Hit cancels only occur on contact, not on a whiff or blocked attack. The chain cannot loop into infinite lights; damage scales down with combo length. The attack and jump buffers are ten frames.
 
 Kite is quick and closes space with a rushing special. Rook is slower, reaches farther, and fires a pulse. Both have 1,000 health, and mirror matches use an alternate palette.
 
@@ -109,3 +109,9 @@ npm run dev    # starts the Node server; also accepts --port
 Optional environment variables: `PORT` (default 3000); `ALLOWED_ORIGINS` (comma-separated browser origins allowed to open WebSockets). Leave the latter unset for a simple public friend-play server, or include every frontend origin you use. No API key or database is required.
 
 The background in `client/assets/rooftop.png` was created with the built-in image-generation tool from this brief: original 16-bit pixel art nighttime rooftop train station, cyan/indigo skyline and amber windows, level fighting floor, orange kiosk left, pipes right, no characters or HUD. The fighter drawings and sound are original project code.
+
+## October 9 combat update (02)
+
+The menu identifies this release as **AIR COMBAT UPDATE · 02**. Both characters can chase their launcher through all three air attacks; air attacks accept directional steering. The visible combo guide follows custom key bindings and is available in Google Sites embeds. Entry-point and combat-module URLs carry a release query so browser caches revalidate the changed files.
+
+Netlify publishes `client/`. Keep `client/shared/` synchronized with the authoritative `shared/` modules. `npm run build` copies the canonical shared modules to `dist/shared/` for other hosts.

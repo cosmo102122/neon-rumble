@@ -1,8 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs';
-import {OpponentAI} from './shared/ai.mjs';
-import {Renderer} from './render.mjs';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261009-02';
+import {OpponentAI} from './shared/ai.mjs?v=20261009-02';
+import {Renderer} from './render.mjs?v=20261009-02';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
+$('game').dataset.version='20261009-02';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI'};
 const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block'};
 function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
@@ -74,15 +75,15 @@ async function roomAction(type,code){clearInput();sound.unlock();notice('Connect
 $('create').onclick=()=>roomAction('create');$('joinForm').onsubmit=e=>{e.preventDefault();roomAction('join',$('roomInput').value.trim().toUpperCase());};$('ready').onclick=()=>send({type:'ready'});
 $('copyInvite').onclick=async()=>{const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('room',room.code);if(serverBase)u.searchParams.set('server',serverBase);try{await navigator.clipboard.writeText(u.href);$('copyInvite').textContent='COPIED — SEND IT TO YOUR RIVAL';}catch{notice('Invite link: '+u.href);}};
 function startAI(){clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,selected==='kite'?'rook':'kite'],{matchId:Date.now()});confirmed=state;ai=new OpponentAI($('difficulty').value);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();$('game').focus();}
-$('practice').onclick=startAI;
+$('practice').onclick=startAI;$('tryUpdate').onclick=startAI;
 function leave(){send({type:'leave'});session(null);room=null;reconnecting=false;networkPause=false;connectionGeneration++;socket?.close();socket=null;mode='menu';state=createMatch([selected,'rook']);confirmed=state;pending=[];clearInput();notice('');show('result',false);setScreen();checkServer();}
 for(const id of ['leaveLobby','leaveResult','leaveMatch'])$(id).onclick=leave;
 $('rematch').onclick=()=>{if(mode==='ai')startAI();else{send({type:'rematch'});$('rematchStatus').textContent='Waiting for your rival…';}};
 $('sound').onclick=()=>{sound.unlock();sound.enabled=!sound.enabled;$('sound').textContent=sound.enabled?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-label',sound.enabled?'Turn sound off':'Turn sound on');};
 $('fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen?.();else $('screen').requestFullscreen?.().catch(()=>notice('Full screen is unavailable in this browser.'));};
-$('help').onclick=()=>{clearInput();$('helpDialog').showModal();};document.querySelectorAll('.dialog-close,.dialog-done').forEach(b=>b.onclick=()=>{b.closest('dialog').close();listening=null;});
+for(const id of ['help','comboHelp'])$(id).onclick=()=>{clearInput();$('helpDialog').showModal();};document.querySelectorAll('.dialog-close,.dialog-done').forEach(b=>b.onclick=()=>{b.closest('dialog').close();listening=null;});
 function renderBindings(){$('bindings').replaceChildren();for(const [name,code]of Object.entries(bindings)){const button=document.createElement('button');button.className='binding'+(listening===name?' listening':'');const k=document.createElement('kbd');k.textContent=listening===name?'PRESS KEY':label(code);button.append(document.createTextNode(LABELS[name]),k);button.onclick=()=>{listening=name;renderBindings();};$('bindings').append(button);}}
-function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});}
+function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');}
 $('rebind').onclick=()=>{clearInput();renderBindings();$('keysDialog').showModal();};$('resetKeys').onclick=()=>{bindings={...DEFAULTS};save('nr-keys',bindings);renderBindings();renderControls();};renderControls();
 $('serverSettings').onclick=()=>{$('serverUrl').value=serverBase;$('serverDialog').showModal();};
 $('saveServer').onclick=async()=>{const value=$('serverUrl').value.trim();if(value){try{const u=new URL(value);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw new Error();if(location.protocol==='https:'&&u.protocol!=='https:')throw new Error();serverBase=u.origin;}catch{notice('Enter a valid HTTPS server address.');return;}}else serverBase='';save('nr-server',serverBase);if(room)leave();else{connectionGeneration++;socket?.close();socket=null;session(null);}$('serverDialog').close();await checkServer();notice(serverReady?'Server connected. Create or join a room.':'Server could not be reached. Check its address and make sure it is running.');};

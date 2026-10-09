@@ -101,6 +101,12 @@ function updateFighter(s,f,o,mask,pressed) {
     else if((mask&B.crouch)&&f.y===0)f.state='crouch';
     else {const axis=+(!!(mask&B.right))-+(!!(mask&B.left));f.x+=axis*stats.speed*(f.y>0?0.86:1);f.state=f.y>0?'jump':axis?'walk':'idle';}
   }
+  // A jump-cancel carries the attacker forward. Keep air attacks steerable so
+  // launcher knockback does not leave the follow-up outside its hitbox.
+  if(f.y>0&&f.move&&!frozen){
+    const axis=+(!!(mask&B.right))-+(!!(mask&B.left));
+    f.x+=(axis||(f.launchCancel?f.face:0))*stats.speed*.78;
+  }
   if(f.y>0||f.vy!==0){f.y+=f.vy;f.vy-=0.42;if(f.y<=0){f.y=0;f.vy=0;f.airChain=0;f.launchCancel=false;if(f.state==='jump'||f.state==='hurt')f.state='idle';emit(s,'land',{p:s.fighters.indexOf(f)});}}
   if(frozen||f.vx!==0){f.x+=f.vx;f.vx*=0.82;if(Math.abs(f.vx)<0.06)f.vx=0;}
   f.x=clamp(f.x,24,W-24);

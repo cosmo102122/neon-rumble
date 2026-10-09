@@ -1,4 +1,4 @@
-import {B,FIGHTERS} from './engine.mjs';
+import {B,FIGHTERS} from './engine.mjs?v=20261009-02';
 export const LEVELS={easy:{reaction:30,decision:20,defense:.23,spacing:36,aggression:.58},normal:{reaction:18,decision:12,defense:.52,spacing:42,aggression:.77},hard:{reaction:10,decision:8,defense:.72,spacing:47,aggression:.89}};
 export class OpponentAI{
   constructor(level='normal',index=1,seed=1897){this.level=LEVELS[level]??LEVELS.normal;this.index=index;this.seed=seed;this.history=[];this.next=0;this.mask=0;}

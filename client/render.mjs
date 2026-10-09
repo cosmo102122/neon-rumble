@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox} from './shared/engine.mjs';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox} from './shared/engine.mjs?v=20261009-02';
 const palettes={kite:{ink:'#0b1223',dark:'#7b303a',body:'#ed7041',light:'#ffbc73',skin:'#f5b782',skinDark:'#bc6b60',pants:'#263e64',pantsLight:'#536b8e',hair:'#48283b',boot:'#ced8e7'},rook:{ink:'#091523',dark:'#187080',body:'#4bc3c7',light:'#c1f5ed',skin:'#b98f78',skinDark:'#77576a',pants:'#242d4f',pantsLight:'#5b577c',hair:'#d7e1eb',boot:'#9bced7'}};
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);

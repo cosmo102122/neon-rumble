@@ -23,6 +23,16 @@
 .second .wins span.won{box-shadow:0 0 8px #68e6e0}
 
 
+.update-card{position:absolute;right:5%;top:8%;width:29%;max-width:350px;padding:18px 20px;background:#091526e8;border:1px solid #68e6e04d;border-top:3px solid var(--cyan);pointer-events:auto;box-shadow:0 10px 30px #0004}
+.update-card .eyebrow{color:var(--cyan);font-size:10px;letter-spacing:1.5px;margin-bottom:10px}
+.update-card>strong{display:block;font-size:clamp(14px,1.65vw,23px);letter-spacing:-.5px}
+.update-card>p:not(.eyebrow){font-size:12px;color:#b4c4d7;line-height:1.5;margin:9px 0 14px}
+.update-card button{display:flex;justify-content:space-between;width:100%;background:#153436;color:var(--cyan);border:1px solid #68e6e052;padding:10px 12px;font:bold 11px 'Courier New',monospace;letter-spacing:1px}
+.combo-guide{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 23px;background:#111f2f;border-top:1px solid #344255;font:11px 'Courier New',monospace}
+.combo-guide strong{color:var(--cyan);letter-spacing:1px}.combo-guide>span{color:#eef4fa;font-size:12px;letter-spacing:1px}.combo-guide button{background:none;color:var(--orange);font:inherit;padding:4px 0}
+@media(max-width:1050px) and (min-width:701px){.update-card{padding:12px;width:27%;top:6%;right:4%}.update-card .eyebrow{font-size:8px}.update-card>p:not(.eyebrow){font-size:11px;margin:7px 0 10px}.update-card button{font-size:9px;padding:8px}.combo-guide{padding:11px 14px}}
+@media(max-width:700px){.update-card{display:none}.combo-guide{padding:12px;gap:8px}.combo-guide>span{font-size:11px;letter-spacing:0}}
+
 /* Google Sites / iframe embed mode */
 html.embedded body{min-height:0;background:#050a12}
 html.embedded .cabinet{max-width:none;margin:0;padding:0}
