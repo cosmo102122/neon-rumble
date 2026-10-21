@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { B, createMatch, step } from '../shared/engine.mjs';
 
+function arena(){const s=createMatch();s.phase='fight';s.fighters[0].x=280;s.fighters[1].x=320;return s;}
+
 function fight(id, face = 1) {
   const s = createMatch([id, id === 'kite' ? 'rook' : 'kite']);
   s.phase = 'fight';
@@ -74,3 +76,9 @@ test('Netlify and the server ship the same combat rules', async () => {
     assert.equal(await readFile(new URL(file, import.meta.url), 'utf8'), canonical);
   }
 });
+test('holding back guards, cross-ups beat it, and back dash moves away',()=>{let s=arena();for(let i=0;i<30;i++)step(s,[i===0?B.light:0,B.right]);assert.equal(s.fighters[1].hp,1000);assert.ok(s.events.some(e=>e.type==='block'));
+  s=arena();s.fighters[0].x=340;for(let i=0;i<30;i++)step(s,[i===0?B.light:0,B.right]);assert.ok(s.fighters[1].hp<1000,'holding the wrong way after a cross-up must not guard');
+  s=arena();for(let i=0;i<40;i++)step(s,[0,B.right]);assert.ok(s.fighters[1].x>330,'holding back with no threat walks back');
+  s=arena();const x=s.fighters[0].x;step(s,[B.dash|B.left,0]);assert.equal(s.fighters[0].dashDir,-1);for(let i=0;i<8;i++)step(s,[B.left,0]);assert.ok(s.fighters[0].x<x-25);});
+test("Kite's special rushes through Rook's pulse",()=>{const s=createMatch(['rook','kite']);s.phase='fight';s.fighters[0].x=60;s.fighters[1].x=320;step(s,[0,B.special]);
+  s.projectiles.push({id:999,owner:0,x:300,y:290-39,vx:4.3,life:100,damage:105,stun:24,blockstun:16,kb:3.1});for(let i=0;i<12;i++)step(s,[0,0]);assert.equal(s.fighters[1].hp,1000);});

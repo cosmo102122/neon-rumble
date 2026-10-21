@@ -1,4 +1,4 @@
-import {B,FIGHTERS} from './engine.mjs?v=20261009-02';
+import {B,FIGHTERS} from './engine.mjs?v=20261021-01';
 export const LEVELS={easy:{reaction:30,decision:20,defense:.23,spacing:36,aggression:.58},normal:{reaction:18,decision:12,defense:.52,spacing:42,aggression:.77},hard:{reaction:10,decision:8,defense:.72,spacing:47,aggression:.89}};
 export class OpponentAI{
   constructor(level='normal',index=1,seed=1897){this.level=LEVELS[level]??LEVELS.normal;this.index=index;this.seed=seed;this.history=[];this.next=0;this.mask=0;}
@@ -15,7 +15,10 @@ export class OpponentAI{
     this.next=s.tick+l.decision+Math.floor(this.random()*5);
     let mask=0;const d=Math.abs(o.x-f.x),toward=o.x>f.x?B.right:B.left,away=o.x>f.x?B.left:B.right;
     const danger=(o.move&&d<100)||seen.projectiles.some(p=>p.owner!==this.index&&Math.abs(p.x-f.x)<110);
-    if(danger&&this.random()<l.defense){mask=B.block;if(o.move==='low'||(o.y===0&&this.random()<.25))mask|=B.crouch;}
+    const pulse=seen.projectiles.some(p=>p.owner!==this.index&&Math.abs(p.x-f.x)<110);
+    // Kite answers pulses like a player would: rush through with the special or jump over.
+    if(pulse&&f.id==='kite'&&!f.move&&f.y===0&&this.random()<l.defense)mask=f.specialCd===0&&d<150?B.special:B.jump|toward;
+    else if(danger&&this.random()<l.defense){mask=B.block;if(o.move==='low'||(o.y===0&&this.random()<.25))mask|=B.crouch;}
     else if(f.move){
       if(f.connected&&this.random()<l.aggression){
         if(f.move==='light')mask=B.light;
@@ -32,7 +35,7 @@ export class OpponentAI{
       if(d>72)mask|=toward;
     }
     else if(d>160){mask=toward;if(f.id==='rook'&&f.specialCd===0&&this.random()<.6)mask=B.special;else if(this.random()<.16)mask|=B.dash;}
-    else if(d>l.spacing+(f.id==='rook'?17:0)){mask=toward;if(this.random()<.08)mask|=B.jump;}
+    else if(d>l.spacing+FIGHTERS[f.id].moves.heavy.range-45){mask=toward;if(f.id==='kite'&&d<110&&this.random()<.3)mask|=B.dash;else if(this.random()<.08)mask|=B.jump;}
     else if(this.random()<l.aggression){const r=this.random();mask=r<.43?B.light:r<.72?B.heavy:r<.86?B.crouch|B.light:f.specialCd===0?B.special:B.heavy;}
     else mask=this.random()<.55?away:B.block;
     this.mask=mask;return mask;

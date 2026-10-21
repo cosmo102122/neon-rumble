@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261009-02';
-import {OpponentAI} from './shared/ai.mjs?v=20261009-02';
-import {Renderer} from './render.mjs?v=20261009-02';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261021-01';
+import {OpponentAI} from './shared/ai.mjs?v=20261021-01';
+import {Renderer} from './render.mjs?v=20261021-01';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261009-02';
+$('game').dataset.version='20261021-01';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI'};
 const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block'};
 function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
@@ -18,7 +18,10 @@ function session(value){savedSession=value;try{value?sessionStorage.setItem('nr-
 function show(id,visible){$(id).classList.toggle('hidden',!visible);}
 function notice(text){$('notice').textContent=text;show('notice',!!text);}
 function label(code){return code.replace(/^Key|^Digit/,'').replace('ShiftLeft','SHIFT').replace('ShiftRight','RSHIFT').replace('Arrow','').replace('Space','SPACE');}
-function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=B[name];if(held.has('Space'))m|=B.jump;return m;}
+// Always-on alternates alongside the rebindable keys: Space and the arrow keys.
+const EXTRA={Space:'jump',ArrowUp:'jump',ArrowDown:'crouch',ArrowLeft:'left',ArrowRight:'right'};
+const isGameKey=code=>Object.values(bindings).includes(code)||code in EXTRA;
+function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=B[name];for(const [code,name]of Object.entries(EXTRA))if(held.has(code))m|=B[name];return m;}
 function clearInput(){held.clear();tapMask=0;if(socket?.readyState===1&&room)send({type:'input',seq:++seq,mask:0});}
 function send(data){if(socket?.readyState===1)socket.send(JSON.stringify(data));}
 function unlock(){sound.unlock();}document.addEventListener('pointerdown',unlock,{once:true});
@@ -26,7 +29,7 @@ document.addEventListener('keydown',e=>{
   if(listening){e.preventDefault();if(e.code==='Escape'){listening=null;renderBindings();return;}if(['Tab','MetaLeft','MetaRight','ControlLeft','ControlRight','Space'].includes(e.code)){notice('Choose another key. Space is always an extra jump key.');return;}
     const other=Object.keys(bindings).find(k=>bindings[k]===e.code);if(other)bindings[other]=bindings[listening];bindings[listening]=e.code;listening=null;save('nr-keys',bindings);renderBindings();renderControls();notice('');return;}
   if(e.target.matches('input,select,textarea')||document.querySelector('dialog[open]'))return;
-  if((mode==='online'||mode==='ai')&&(Object.values(bindings).includes(e.code)||e.code==='Space')){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=B[k];if(e.code==='Space')tapMask|=B.jump;}held.add(e.code);}
+  if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=B[k];if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
 });
 document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
 function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=id==='kite'?'01 / 02':'02 / 02';}
