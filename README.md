@@ -71,8 +71,8 @@ Official deployment references: https://render.com/docs/deploy-node-express-app 
 | Heavy attack | K |
 | Special | L |
 | Command specials | Down + Special, Forward + Special |
-| EX special (half meter) | Light + Special |
-| Super (full meter) | Heavy + Special |
+| EX special (half meter) | O, or Light + Special |
+| Super (full meter) | U, or Heavy + Special |
 | Guard | Hold away from your rival (or hold I) |
 
 Click **Edit Keys** to change bindings. Changes stay on that browser. Hold down-back to block lows; use standing guard against jumping attacks. Jumping over your rival flips which direction counts as "away". Only EX specials and supers do chip damage. Air attacks are overheads. Crouch + light performs a low.

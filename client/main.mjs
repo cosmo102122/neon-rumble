@@ -1,11 +1,13 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-02';
-import {OpponentAI} from './shared/ai.mjs?v=20261027-02';
-import {Renderer} from './render.mjs?v=20261027-02';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-03';
+import {OpponentAI} from './shared/ai.mjs?v=20261027-03';
+import {Renderer} from './render.mjs?v=20261027-03';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261027-02';
-const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI'};
-const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block'};
+$('game').dataset.version='20261027-03';
+const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
+// One-press shortcuts for the two-button meter moves.
+const COMBO={super:B.heavy|B.special,ex:B.light|B.special};
+const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block',super:'Super (full bar)',ex:'EX special (half bar)'};
 function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
 function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
 let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,listening=null,selected=stored('nr-fighter','kite');if(!FIGHTERS[selected])selected='kite';
@@ -22,7 +24,7 @@ function label(code){return code.replace(/^Key|^Digit/,'').replace('ShiftLeft','
 // Always-on alternates alongside the rebindable keys: Space and the arrow keys.
 const EXTRA={Space:'jump',ArrowUp:'jump',ArrowDown:'crouch',ArrowLeft:'left',ArrowRight:'right'};
 const isGameKey=code=>Object.values(bindings).includes(code)||code in EXTRA;
-function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=B[name];for(const [code,name]of Object.entries(EXTRA))if(held.has(code))m|=B[name];return m;}
+function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=(B[name]??COMBO[name]);for(const [code,name]of Object.entries(EXTRA))if(held.has(code))m|=(B[name]??COMBO[name]);return m;}
 function clearInput(){held.clear();tapMask=0;if(socket?.readyState===1&&room)send({type:'input',seq:++seq,mask:0});}
 function send(data){if(socket?.readyState===1)socket.send(JSON.stringify(data));}
 function unlock(){sound.unlock();}document.addEventListener('pointerdown',unlock,{once:true});
@@ -31,7 +33,7 @@ document.addEventListener('keydown',e=>{
     const other=Object.keys(bindings).find(k=>bindings[k]===e.code);if(other)bindings[other]=bindings[listening];bindings[listening]=e.code;listening=null;save('nr-keys',bindings);renderBindings();renderControls();notice('');return;}
   if(e.target.matches('input,select,textarea')||document.querySelector('dialog[open]'))return;
   if(training&&mode==='ai'&&e.code==='KeyR'&&!Object.values(bindings).includes('KeyR')){e.preventDefault();startAI(true);return;}
-  if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=B[k];if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
+  if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=(B[k]??COMBO[k]);if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
 });
 document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
 function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=id==='kite'?'01 / 02':'02 / 02';}
@@ -75,11 +77,11 @@ function onMessage(m){
 }
 function renderLobby(){if(!room)return;$('players').replaceChildren();for(let i=0;i<2;i++){const p=room.players[i],div=document.createElement('div');div.className='player-slot'+(p?.ready?' is-ready':'');const strong=document.createElement('strong');strong.textContent=p?FIGHTERS[p.fighter].name:'OPEN SLOT';div.append(strong,document.createTextNode(p?(p.ready?'READY':i===myIndex?'YOU':'CONNECTED'):'WAITING…'));$('players').append(div);}$('ready').textContent=room.players[myIndex]?.ready?'READY — WAITING FOR RIVAL':'READY TO FIGHT';}
 function setScreen(){const playing=mode==='ai'||mode==='online';show('menu',mode==='menu');show('lobby',mode==='lobby');show('hud',playing);show('fightFooter',playing);show('pause',playing&&(networkPause||reconnecting));$('screen').classList.toggle('playing',playing);const result=playing&&['matchOver','forfeit'].includes(confirmed.phase);show('result',result);if(result){const w=confirmed.winner;$('resultLabel').textContent=confirmed.phase==='forfeit'?'MATCH ENDED · '+confirmed.roundReason.toUpperCase():'MATCH COMPLETE';$('resultTitle').textContent=w<0?'NO CONTEST':w===myIndex?'YOU WIN':'RIVAL WINS';$('resultScore').textContent=`${FIGHTERS[confirmed.fighters[0].id].name}  ${confirmed.wins[0]} — ${confirmed.wins[1]}  ${FIGHTERS[confirmed.fighters[1].id].name}`;if(lastMatchShown!==confirmed.matchId){lastMatchShown=confirmed.matchId;clearInput();}}$('matchMode').textContent=training?'TRAINING':mode==='ai'?`PRACTICE / ${$('difficulty').value.toUpperCase()}`:`ROOM ${room?.code??''} / YOU ARE P${myIndex+1}`;}
-function updateHUD(){const s=confirmed;const key=`${s.matchId}|${s.phase}|${Math.ceil(s.timer/60)}|${s.fighters.map(f=>f.hp)}|${s.wins}|${s.round}|${myIndex}|${s.fighters.map(f=>f.id)}|${s.fighters.map(f=>Math.floor(f.meter??0))}|${training}`;if(key===lastHud)return;lastHud=key;for(let i=0;i<2;i++){$('name'+i).textContent=FIGHTERS[s.fighters[i].id].name;$('tag'+i).textContent=i===myIndex?'YOU':training?'DUMMY':mode==='ai'?'CPU':'RIVAL';const mtr=Math.floor(s.fighters[i].meter??0);$('meter'+i).style.width=mtr+'%';$('meterBar'+i).classList.toggle('half',mtr>=50&&mtr<100);$('meterBar'+i).classList.toggle('full',mtr>=100);$('meterLabel'+i).textContent=mtr>=100?'SUPER READY':mtr>=50?'EX READY':'';$('health'+i).style.width=Math.max(0,s.fighters[i].hp/10)+'%';$('health'+i).parentElement.setAttribute('aria-label',`${FIGHTERS[s.fighters[i].id].name} health ${s.fighters[i].hp} of 1000`);$('wins'+i).innerHTML=[0,1].map(n=>`<span class="${n<s.wins[i]?'won':''}"></span>`).join('');}$('timer').textContent=s.training?'∞':Math.max(0,Math.ceil(s.timer/60)).toString().padStart(2,'0');$('round').textContent='ROUND '+s.round;setScreen();}
+function updateHUD(){const s=confirmed;const key=`${s.matchId}|${s.phase}|${Math.ceil(s.timer/60)}|${s.fighters.map(f=>f.hp)}|${s.wins}|${s.round}|${myIndex}|${s.fighters.map(f=>f.id)}|${s.fighters.map(f=>Math.floor(f.meter??0))}|${training}`;if(key===lastHud)return;lastHud=key;for(let i=0;i<2;i++){$('name'+i).textContent=FIGHTERS[s.fighters[i].id].name;$('tag'+i).textContent=i===myIndex?'YOU':training?'DUMMY':mode==='ai'?'CPU':'RIVAL';const mtr=Math.floor(s.fighters[i].meter??0);$('meter'+i).style.width=mtr+'%';$('meterBar'+i).classList.toggle('half',mtr>=50&&mtr<100);$('meterBar'+i).classList.toggle('full',mtr>=100);$('meterLabel'+i).textContent=mtr>=100?'SUPER READY'+(i===myIndex?' · PRESS '+label(bindings.super):''):mtr>=50?'EX READY'+(i===myIndex?' · PRESS '+label(bindings.ex):''):'';$('health'+i).style.width=Math.max(0,s.fighters[i].hp/10)+'%';$('health'+i).parentElement.setAttribute('aria-label',`${FIGHTERS[s.fighters[i].id].name} health ${s.fighters[i].hp} of 1000`);$('wins'+i).innerHTML=[0,1].map(n=>`<span class="${n<s.wins[i]?'won':''}"></span>`).join('');}{const mm=Math.floor(s.fighters[myIndex].meter??0);setGuide(mm>=100?'super':mm>=50?'ex':'combo');}$('timer').textContent=s.training?'∞':Math.max(0,Math.ceil(s.timer/60)).toString().padStart(2,'0');$('round').textContent='ROUND '+s.round;setScreen();}
 async function roomAction(type,code){clearInput();sound.unlock();notice('Connecting to the room server…');$('create').disabled=true;try{await connect();send({type,fighter:selected,...(code?{code}:{})});}catch(e){notice(e.message);$('serverDialog').showModal();$('serverUrl').value=serverBase;}finally{$('create').disabled=false;}}
 $('create').onclick=()=>roomAction('create');$('joinForm').onsubmit=e=>{e.preventDefault();roomAction('join',$('roomInput').value.trim().toUpperCase());};$('ready').onclick=()=>send({type:'ready'});
 $('copyInvite').onclick=async()=>{const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('room',room.code);if(serverBase)u.searchParams.set('server',serverBase);try{await navigator.clipboard.writeText(u.href);$('copyInvite').textContent='COPIED — SEND IT TO YOUR RIVAL';}catch{notice('Invite link: '+u.href);}};
-function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,selected==='kite'?'rook':'kite'],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();$('game').focus();}
+function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,selected==='kite'?'rook':'kite'],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();if(training)notice(`Training: your meter stays full. Press ${label(bindings.super)} for your SUPER, ${label(bindings.ex)} for an EX special, and try Down/Forward + ${label(bindings.special)}.`);$('game').focus();}
 $('practice').onclick=()=>startAI(false);$('training').onclick=()=>startAI(true);$('tryUpdate').onclick=()=>startAI(true);
 // Training dummy: stands still by default; can guard (high or low) or hop so you can test overheads and anti-airs.
 function dummyMask(s){const d=s.fighters[1],p=s.fighters[0],away=d.x>=p.x?B.right:B.left;return[0,away,away|B.crouch,s.tick%50===0?B.jump:0][dummyMode];}
@@ -93,20 +95,42 @@ $('sound').onclick=()=>{sound.unlock();sound.enabled=!sound.enabled;$('sound').t
 $('fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen?.();else $('screen').requestFullscreen?.().catch(()=>notice('Full screen is unavailable in this browser.'));};
 for(const id of ['help','comboHelp'])$(id).onclick=()=>{clearInput();$('helpDialog').showModal();};document.querySelectorAll('.dialog-close,.dialog-done').forEach(b=>b.onclick=()=>{b.closest('dialog').close();listening=null;});
 function renderBindings(){$('bindings').replaceChildren();for(const [name,code]of Object.entries(bindings)){const button=document.createElement('button');button.className='binding'+(listening===name?' listening':'');const k=document.createElement('kbd');k.textContent=listening===name?'PRESS KEY':label(code);button.append(document.createTextNode(LABELS[name]),k);button.onclick=()=>{listening=name;renderBindings();};$('bindings').append(button);}}
-function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');}
+function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block'],['super']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block','Super'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');}
+// The strip under the arena teaches the combo, and switches to the meter moves when your bar is ready.
+let guideMode='';function setGuide(m){if(m===guideMode)return;guideMode=m;const g=document.querySelector('.combo-guide strong');
+  if(m==='super'){g.textContent='SUPER READY';$('comboKeys').textContent=`Press ${label(bindings.super)}  ·  or ${label(bindings.heavy)} + ${label(bindings.special)} together`;}
+  else if(m==='ex'){g.textContent='EX READY';$('comboKeys').textContent=`Press ${label(bindings.ex)} for a powered-up special  ·  fill the bar for a Super`;}
+  else{g.textContent='LAUNCH & CHASE';$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');}}
 $('rebind').onclick=()=>{clearInput();renderBindings();$('keysDialog').showModal();};$('resetKeys').onclick=()=>{bindings={...DEFAULTS};save('nr-keys',bindings);renderBindings();renderControls();};renderControls();
 $('serverSettings').onclick=()=>{$('serverUrl').value=serverBase;$('serverDialog').showModal();};
 $('saveServer').onclick=async()=>{const value=$('serverUrl').value.trim();if(value){try{const u=new URL(value);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw new Error();if(location.protocol==='https:'&&u.protocol!=='https:')throw new Error();serverBase=u.origin;}catch{notice('Enter a valid HTTPS server address.');return;}}else serverBase='';save('nr-server',serverBase);if(room)leave();else{connectionGeneration++;socket?.close();socket=null;session(null);}$('serverDialog').close();await checkServer();notice(serverReady?'Server connected. Create or join a room.':'Server could not be reached. Check its address and make sure it is running.');};
 let previousTick=performance.now(),acc=0,frames=0,fpsTime=previousTick,simulationTicks=0,simulationTime=previousTick;
+let prevPos=null,prevProj=null;
+function rememberPositions(){prevPos=state.fighters.map(f=>({x:f.x,y:f.y}));prevProj=new Map(state.projectiles.map(p=>[p.id,p.x]));}
 function advance(){
+  rememberPositions();
   if(mode==='ai'&&!document.querySelector('dialog[open]')&&!document.hidden){step(state,[mask(),training?dummyMask(state):ai.input(state)]);confirmed=state;renderer.events(state,e=>sound.event(e));updateHUD();}
   else if(mode==='online'&&room&&socket?.readyState===1&&!networkPause&&!reconnecting){const m=document.hidden?0:mask();send({type:'input',seq:++seq,mask:m});pending.push({seq,mask:m});if(pending.length>120)pending.shift();if(performance.now()-lastSnapshot<300){const inputs=[...lastServerInputs];inputs[myIndex]=m;step(state,inputs);}}
 }
-// Networking/simulation is independent of rendering cadence and display refresh rate.
-setInterval(()=>{const now=performance.now();acc+=Math.min(100,now-previousTick);previousTick=now;let count=0;while(acc>=1000/60&&count++<6){acc-=1000/60;advance();simulationTicks++;}if(now-simulationTime>2000){$('game').dataset.simFps=Math.round(simulationTicks*1000/(now-simulationTime));simulationTicks=0;simulationTime=now;}},4);
+// The 60 Hz simulation is stepped from the display loop (fixed timestep), so every screen refresh sees an
+// even amount of game time; positions are interpolated between ticks for smooth motion at 60/120/144 Hz.
+// A slow backup timer keeps online input flowing while the tab is hidden and the display loop is paused.
+const TICK=1000/60;let lastFrame=0;
+function tick(now){acc+=Math.min(100,now-previousTick);previousTick=now;let count=0;while(acc>=TICK&&count++<6){acc-=TICK;advance();simulationTicks++;}if(count>=6)acc=0;if(now-simulationTime>2000){$('game').dataset.simFps=Math.round(simulationTicks*1000/(now-simulationTime));simulationTicks=0;simulationTime=now;}}
+setInterval(()=>{const now=performance.now();if(now-lastFrame>120)tick(now);},50);
+const lerp=(a,b,k)=>a+(b-a)*k;
+function viewState(){
+  if(!prevPos||prevPos.length!==state.fighters.length||mode==='menu'||mode==='lobby')return state;
+  const k=Math.min(1,acc/TICK);
+  // Skip interpolation across teleports (round resets, rollback corrections).
+  const fighters=state.fighters.map((f,i)=>{const p=prevPos[i];return Math.abs(p.x-f.x)>40||Math.abs(p.y-f.y)>40?f:{...f,x:lerp(p.x,f.x,k),y:lerp(p.y,f.y,k)};});
+  const projectiles=state.projectiles.map(p=>prevProj.has(p.id)?{...p,x:lerp(prevProj.get(p.id),p.x,k)}:p);
+  return{...state,fighters,projectiles};
+}
 function frame(t){
+  lastFrame=performance.now();tick(lastFrame);
   const stale=mode==='online'&&lastSnapshot&&performance.now()-lastSnapshot>1800&&!['matchOver','forfeit'].includes(confirmed.phase);if(stale&&!networkPause){$('pause').textContent='Waiting for the server…';show('pause',true);}else if(mode==='online'&&!networkPause&&!reconnecting)show('pause',false);
-  const began=performance.now();renderer.draw(state,t,{menu:mode==='menu'||mode==='lobby',selected,paused:networkPause,boxes:training&&showBoxes});$('game').dataset.renderMs=(performance.now()-began).toFixed(1);frames++;if(t-fpsTime>2000){$('game').dataset.fps=Math.round(frames*1000/(t-fpsTime));frames=0;fpsTime=t;}requestAnimationFrame(frame);
+  const began=performance.now();renderer.draw(viewState(),t,{menu:mode==='menu'||mode==='lobby',selected,paused:networkPause,boxes:training&&showBoxes});$('game').dataset.renderMs=(performance.now()-began).toFixed(1);frames++;if(t-fpsTime>2000){$('game').dataset.fps=Math.round(frames*1000/(t-fpsTime));frames=0;fpsTime=t;}requestAnimationFrame(frame);
 }requestAnimationFrame(frame);
 setInterval(()=>{if(socket?.readyState===1)send({type:'ping',time:performance.now()});},2000);
 checkServer().then(async()=>{if(savedSession&&savedSession.server===serverBase){try{await connect();send({type:'resume',code:savedSession.code,token:savedSession.token});}catch{session(null);}}});
