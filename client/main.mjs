@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-01';
-import {OpponentAI} from './shared/ai.mjs?v=20261027-01';
-import {Renderer} from './render.mjs?v=20261027-01';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-02';
+import {OpponentAI} from './shared/ai.mjs?v=20261027-02';
+import {Renderer} from './render.mjs?v=20261027-02';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261027-01';
+$('game').dataset.version='20261027-02';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI'};
 const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block'};
 function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}

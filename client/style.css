@@ -55,8 +55,7 @@ html.embedded .screen{border-top:1px solid #26354a}
 .second .meter>div{margin-left:auto;background:linear-gradient(270deg,#11697c,#6dfff2)}
 .meter::after{content:'';position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:#e0e3e8aa}
 .meter.half{border-color:#ffe08a}.meter.full{border-color:#fff;box-shadow:0 0 10px #ffd23f,0 0 3px #fff}.second .meter.full{box-shadow:0 0 10px #6dfff2,0 0 3px #fff}
-.meter.full>div{animation:meterpulse .6s ease-in-out infinite alternate}@keyframes meterpulse{to{filter:brightness(1.5)}}
+.meter.full>div{filter:brightness(1.25)}
 .meter-label{font:bold 9px 'Courier New',monospace;letter-spacing:1px;color:#ffe08a;min-width:70px}.second .meter-label{text-align:right;color:#9ffff6}
 .training-tools{display:flex;gap:8px}.training-tools button{font:10px monospace;background:#0e1b2ccd;border:1px solid #56637d;padding:7px 11px}
 @media(max-width:700px){.meter{height:5px}.meter-label{font-size:6px;min-width:40px}.training-tools button{font-size:7px;padding:4px}}
-@media(prefers-reduced-motion:reduce){.meter.full>div{animation:none}}

@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261027-01';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261027-02';
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);
 const easeInOut=v=>{v=clamp01(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
@@ -43,8 +43,8 @@ function pose(f,t,r){
   const P={hip:[-1,r.hip],chest:[1,r.chest],head:[3,r.head],bf:[-11,-1],ff:[11,-1],bh:[9,r.chest+2],fh:[17,r.chest-3],fx:0};
   const set=(o)=>Object.assign(P,o),shift=(k,dx,dy=0)=>{P[k]=[P[k][0]+dx,P[k][1]+dy];};
   const crouch=f.y===0&&(f.state==='crouch'||f.state==='blockLow'||f.move==='low');
-  if(f.state==='idle'&&!f.move){const b=Math.round(Math.sin(t/160)*1.2);for(const k of['hip','chest','head','bh','fh'])shift(k,0,b);}
-  if(f.state==='walk'){const c=Math.sin(t/75);P.bf=[-9+c*9,-1-Math.max(0,c)*4];P.ff=[9-c*9,-1-Math.max(0,-c)*4];const b=Math.round(Math.abs(c)*-1.5);for(const k of['hip','chest','head','bh','fh'])shift(k,0,b);}
+  if(f.state==='idle'&&!f.move){const b=Math.round(Math.sin(t*TAU/1440)*1.2);for(const k of['hip','chest','head','bh','fh'])shift(k,0,b);}
+  if(f.state==='walk'){const c=Math.sin(t*TAU/480);P.bf=[-9+c*9,-1-Math.max(0,c)*4];P.ff=[9-c*9,-1-Math.max(0,-c)*4];const b=Math.round(Math.abs(c)*-1.5);for(const k of['hip','chest','head','bh','fh'])shift(k,0,b);}
   if(crouch)set({hip:[-4,r.hip+12],chest:[4,r.chest+15],head:[8,r.head+15],bf:[-14,-1],ff:[15,-1],bh:[12,r.chest+13],fh:[19,r.chest+10]});
   if(f.y>0)set({hip:[-2,r.hip],chest:[1,r.chest+1],head:[3,r.head+1],bf:[-11,-15],ff:[9,-19]});
   if(f.state==='dash'){if((f.dashDir??1)>0)set({hip:[-6,r.hip+3],chest:[5,r.chest+5],head:[10,r.head+6],bf:[-22,-1],ff:[14,-1],bh:[-12,r.chest+6],fh:[20,r.chest+3]});
@@ -82,10 +82,31 @@ function pose(f,t,r){
   return{P,crouch};
 }
 // Pixel poses are authored in gameplay coordinates, not CSS images.
+// Each distinct pose is painted once into a small canvas and reused, so a frame costs a few drawImage calls
+// instead of thousands of fillRects. Looping states are sampled every 40 ms of their shared 1440 ms cycle.
+const SPR_W=124,SPR_H=100,SPR_OX=52,SPR_OY=92,SPR_MAX=500,sprites=new Map();
+const LOOPING=['idle','walk','crouch','block','blockLow'];
+const makeCanvas=(w,h)=>typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(w,h):typeof document!=='undefined'?Object.assign(document.createElement('canvas'),{width:w,height:h}):null;
+function sprite(f,t,alt){
+  const loop=!f.move&&LOOPING.includes(f.state),tq=loop?(Math.floor(t/40)%36)*40:0;
+  const key=`${f.id}|${alt?1:0}|${f.state}|${f.move??''}|${f.move?f.mf:0}|${f.y>0?1:0}|${f.state==='dash'?f.dashDir??1:0}|${f.hp<=0?1:0}|${tq}`;
+  let spr=sprites.get(key);
+  if(spr){sprites.delete(key);sprites.set(key,spr);return spr;}
+  spr=makeCanvas(SPR_W,SPR_H);if(!spr)return null;
+  const g=spr.getContext('2d');g.imageSmoothingEnabled=false;g.translate(SPR_OX,SPR_OY);paintFighter(g,f,tq,alt);
+  sprites.set(key,spr);if(sprites.size>SPR_MAX)sprites.delete(sprites.keys().next().value);
+  return spr;
+}
 export function drawFighter(ctx,f,t,{scale=1,alt=false,ghost=false,alpha=null}={}){
-  const p={...palettes[f.id],...(alt?alts[f.id]:{})},r=RIG[f.id],rook=f.id==='rook',O=2,baseAlpha=alpha??(ghost?.22:1);
-  ctx.save();ctx.translate(Math.round(f.x),Math.round(FLOOR-f.y));ctx.scale(f.face*scale,scale);ctx.globalAlpha=baseAlpha;
+  const spr=sprite(f,t,alt);
+  ctx.save();ctx.translate(Math.round(f.x),Math.round(FLOOR-f.y));ctx.scale(f.face*scale,scale);ctx.globalAlpha=alpha??(ghost?.22:1);
   if(f.hp<=0){ctx.translate(-8,0);ctx.rotate(-f.face*Math.PI*.4);ctx.scale(1,.82);}
+  if(spr)ctx.drawImage(spr,-SPR_OX,-SPR_OY);else paintFighter(ctx,f,t,alt); // no canvas available (e.g. Node tools): paint directly
+  ctx.restore();
+}
+function paintFighter(ctx,f,t,alt){
+  const p={...palettes[f.id],...(alt?alts[f.id]:{})},r=RIG[f.id],rook=f.id==='rook',O=2,baseAlpha=ctx.globalAlpha;
+  ctx.save();
   const {P}=pose(f,t,r),{hip,chest,head}=P,hurt=f.state==='hurt'||f.hp<=0;
   const rect=(x,y,w,h,col)=>{ctx.fillStyle=col;ctx.fillRect(Math.round(x),Math.round(y),w,h);};
   // Chunky 2px outline: all pieces of a group are outlined first, then filled, so overlapping parts merge into one silhouette.
@@ -118,14 +139,14 @@ export function drawFighter(ctx,f,t,{scale=1,alt=false,ghost=false,alpha=null}={
   const neck=[chest[0]-1,chest[1]-3],shF=[chest[0]+3,chest[1]+2],shB=[chest[0]-4,chest[1]+2],tw=r.torso,th=hip[1]-chest[1];
   // Back layer: Kite's striped scarf / Rook's coat tail, then the back leg and arm.
   if(!rook){const lift=f.state==='dash'||f.y>0||f.move==='special'?-3:0,parts=[];
-    for(let i=0;i<7;i++){const x=neck[0]-4-i*4.5,y=neck[1]+2+i*1.6+Math.sin(t/110+i*.9)*i*.7+lift*i*.4;parts.push([x-3,y-2,6,5,i%2?p.dark:p.trim]);}
+    for(let i=0;i<7;i++){const x=neck[0]-4-i*4.5,y=neck[1]+2+i*1.6+Math.sin(t*TAU/720+i*.9)*i*.7+lift*i*.4;parts.push([x-3,y-2,6,5,i%2?p.dark:p.trim]);}
     group(parts);for(const[x,y]of parts)rect(x,y,6,1,'#ffffff40');}
   else{group([[hip[0]-14,hip[1]-5,10,18,p.dark]]);rect(hip[0]-13,hip[1]-4,8,2,p.body);rect(hip[0]-14,hip[1]+10,10,2,p.trim);}
   leg(P.bf,false);arm(shB,P.bh,false);
   // Torso.
   chain([[hip,[chest[0],chest[1]+2],tw,p.body]]);
   if(rook){rect(chest[0]-6,chest[1]+1,14,12,shade(p.body,.22));rect(chest[0]-6,chest[1]+13,14,1,p.ink);rect(chest[0]-6,hip[1]-7,14,1,p.dark);rect(chest[0]-6,hip[1]-11,14,1,p.dark);
-    const pulse=.65+.35*Math.sin(t/180);rect(chest[0],chest[1]+4,6,6,p.ink);ctx.globalAlpha=baseAlpha*pulse;rect(chest[0]+1,chest[1]+5,4,4,p.glow);ctx.globalAlpha=baseAlpha;
+    const pulse=.65+.35*Math.sin(t*TAU/1440);rect(chest[0],chest[1]+4,6,6,p.ink);ctx.globalAlpha=baseAlpha*pulse;rect(chest[0]+1,chest[1]+5,4,4,p.glow);ctx.globalAlpha=baseAlpha;
     rect(chest[0]-10,chest[1]-3,11,3,p.dark);
     group([[chest[0]-2,chest[1]-7,16,9,p.dark]]);rect(chest[0]-2,chest[1]-7,16,2,p.light);rect(chest[0]+1,chest[1]-3,11,2,p.trim);rect(chest[0]+11,chest[1]-6,2,2,p.accent);}
   else{rect(chest[0]+2,chest[1]+1,5,th-4,p.shirt);rect(chest[0]+1,chest[1]+1,1,th-4,p.trim);rect(chest[0]+3,chest[1]+5,3,3,p.glow);rect(chest[0]+4,chest[1]+8,2,2,p.glow);
@@ -148,13 +169,6 @@ export function drawFighter(ctx,f,t,{scale=1,alt=false,ghost=false,alpha=null}={
 }
 // ---- Living stage: tuned to the rooftop background (track, billboards, wet floor). ----
 const hash=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
-function drawTrain(c,t){
-  const period=17000,run=6500,ph=t%period;if(ph>run)return;
-  const head=548-ph/run*(548-70);c.save();c.beginPath();c.rect(276,138,269,24);c.clip();
-  for(let i=0;i<4;i++){const x=Math.round(head+i*49);c.fillStyle='#0d1428';c.fillRect(x,146,47,12);c.fillStyle='#2b3a63';c.fillRect(x,146,47,2);
-    for(let k=0;k<6;k++){c.fillStyle=hash(i*9+k)>.2?'#ffd27a':'#7c6a4a';c.fillRect(x+4+k*7,150,4,3);}}
-  c.fillStyle='#fff6c8';c.fillRect(Math.round(head)-1,153,3,2);c.globalCompositeOperation='lighter';c.globalAlpha=.25;c.fillStyle='#ffe9a8';c.fillRect(Math.round(head)-26,152,25,4);c.restore();
-}
 const SIGNS=[[566,68,15,29,'#ff5fd0'],[250,68,13,33,'#5fe4ff'],[160,114,7,29,'#ff6ad5'],[30,141,59,7,'#ffb04a']];
 function drawSigns(c,t){
   SIGNS.forEach(([x,y,w,h,col],i)=>{const off=hash(Math.floor(t/80)+i*31)<.035;c.save();
@@ -162,7 +176,7 @@ function drawSigns(c,t){
     c.restore();});
 }
 function drawRain(c,t,reduced){
-  c.save();c.globalAlpha=.28;c.fillStyle='#a9c8ff';const n=reduced?30:90;
+  c.save();c.globalAlpha=.22;c.fillStyle='#a9c8ff';const n=reduced?25:60;
   for(let i=0;i<n;i++){const sp=.38+hash(i)*.22,x=Math.round(((hash(i+7)*W*1.3+t*.08*sp)%(W+60))-30),y=Math.round(((hash(i+3)*H+t*sp)%(H+20))-20);c.fillRect(x,y,1,4);c.fillRect(x+1,y+4,1,4);}
   c.globalAlpha=1;
   for(let i=0;i<14;i++){const tt=t+i*137,k=Math.floor(tt/600),age=(tt%600)/600,x=Math.round(hash(k*13+i)*W),y=Math.round(252+hash(k*7+i)*50),r=1+age*5;
@@ -223,9 +237,10 @@ export class Renderer{
     let sx=0,sy=0;
     if(this.shake>0&&!this.reduced){sx=Math.sin(t*.19)*this.shake;sy=Math.cos(t*.23)*this.shake*.45;this.shake*=.76;if(this.shake<.18)this.shake=0;}
     c.translate(W/2+sx,H/2+sy);c.scale(zoom,zoom);c.translate(-focusX,-focusY);
-    c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);if(this.stage.complete&&this.stage.naturalWidth)c.drawImage(this.stage,0,0,W,H);
-    c.fillStyle='#07172c20';c.fillRect(0,0,W,H);
-    drawTrain(c,t);drawSigns(c,t);
+    c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);const stage=this.stageLayer();
+    // Smooth only the backdrop: it is a downscaled painting, and nearest-neighbour makes it shimmer as the camera moves.
+    if(stage){c.imageSmoothingEnabled=true;c.drawImage(stage,0,0);c.imageSmoothingEnabled=false;}
+    drawSigns(c,t);
     // Low-key city animation and drifting rooftop dust.
     c.globalAlpha=.3;for(let i=0;i<13;i++){const x=(i*63+t*.007)%W,y=170+(i*23)%120;c.fillStyle=i%2?'#a4c8e0':'#ffbb75';c.fillRect(Math.floor(x),Math.floor(y+Math.sin(t/800+i)*3),1,1);}c.globalAlpha=1;
     const fighters=live;
@@ -320,7 +335,7 @@ export class Renderer{
         for(const p of s.projectiles){const b=projectileBox(p);c.globalAlpha=.45;c.fillStyle='#ff3b5c';c.fillRect(b.x,b.y,b.w,b.h);c.globalAlpha=1;}c.restore();}
       // Cinematic edge vignette during active combat.
       if(s.phase==='fight'){
-        const g=c.createRadialGradient(W/2,H/2,90,W/2,H/2,360);g.addColorStop(0,'#00000000');g.addColorStop(1,'#02060c7a');c.fillStyle=g;c.fillRect(0,0,W,H);
+        c.drawImage(this.vignetteLayer(),0,0);
       }
     }
     drawRain(c,t,this.reduced);
@@ -328,6 +343,19 @@ export class Renderer{
     if(this.flash>0&&!this.reduced){c.restore();c.save();c.globalAlpha=this.flash*.28;c.fillStyle='#fff4dc';c.fillRect(0,0,W,H);this.flash*=.56;this.cameraPunch*=.5;if(this.cameraPunch<.002)this.cameraPunch=0;}
     c.restore();
     if(!menu&&s.freeze>0)this.superBanner(s);
+  }
+  stageLayer(){
+    if(this.stageCanvas)return this.stageCanvas;
+    if(!(this.stage.complete&&this.stage.naturalWidth))return null;
+    const cv=makeCanvas(W,H),g=cv.getContext('2d');g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+    g.drawImage(this.stage,0,0,W,H);g.fillStyle='#07172c20';g.fillRect(0,0,W,H);
+    return this.stageCanvas=cv;
+  }
+  vignetteLayer(){
+    if(this.vignette)return this.vignette;
+    const cv=makeCanvas(W,H),g=cv.getContext('2d'),gr=g.createRadialGradient(W/2,H/2,90,W/2,H/2,360);
+    gr.addColorStop(0,'#00000000');gr.addColorStop(1,'#02060c7a');g.fillStyle=gr;g.fillRect(0,0,W,H);
+    return this.vignette=cv;
   }
   superBanner(s){
     const u=s.fighters[s.freezeBy];if(!u||!s.freeze)return;const m=FIGHTERS[u.id].moves.super,k=1-s.freeze/SUPER_FREEZE,side=s.freezeBy?-1:1;
