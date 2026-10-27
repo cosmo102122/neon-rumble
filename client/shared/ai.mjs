@@ -1,11 +1,11 @@
-import {B,FIGHTERS} from './engine.mjs?v=20261021-01';
+import {B,FIGHTERS} from './engine.mjs?v=20261027-01';
 export const LEVELS={easy:{reaction:30,decision:20,defense:.23,spacing:36,aggression:.58},normal:{reaction:18,decision:12,defense:.52,spacing:42,aggression:.77},hard:{reaction:10,decision:8,defense:.72,spacing:47,aggression:.89}};
 export class OpponentAI{
   constructor(level='normal',index=1,seed=1897){this.level=LEVELS[level]??LEVELS.normal;this.index=index;this.seed=seed;this.history=[];this.next=0;this.mask=0;}
   random(){this.seed=(1664525*this.seed+1013904223)>>>0;return this.seed/4294967296;}
   input(s){
     const l=this.level;
-    this.history.push({tick:s.tick,fighters:s.fighters.map(f=>({id:f.id,x:f.x,y:f.y,move:f.move,stun:f.stun,specialCd:f.specialCd,hp:f.hp,connected:f.connected,airChain:f.airChain??0,combo:f.combo??0})),projectiles:s.projectiles.map(p=>({owner:p.owner,x:p.x,vx:p.vx}))});
+    this.history.push({tick:s.tick,fighters:s.fighters.map(f=>({id:f.id,x:f.x,y:f.y,move:f.move,stun:f.stun,specialCd:f.specialCd,hp:f.hp,connected:f.connected,airChain:f.airChain??0,combo:f.combo??0,meter:f.meter??0})),projectiles:s.projectiles.map(p=>({owner:p.owner,x:p.x,vx:p.vx,low:!!p.low}))});
     if(this.history.length>l.reaction+2)this.history.shift();
     if(s.phase!=='fight'||this.history.length<=l.reaction)return 0;
     // Observe only delayed public game state; never inspect the human's inputs.
@@ -18,11 +18,13 @@ export class OpponentAI{
     const pulse=seen.projectiles.some(p=>p.owner!==this.index&&Math.abs(p.x-f.x)<110);
     // Kite answers pulses like a player would: rush through with the special or jump over.
     if(pulse&&f.id==='kite'&&!f.move&&f.y===0&&this.random()<l.defense)mask=f.specialCd===0&&d<150?B.special:B.jump|toward;
-    else if(danger&&this.random()<l.defense){mask=B.block;if(o.move==='low'||(o.y===0&&this.random()<.25))mask|=B.crouch;}
+    // Kite swats jump-ins with the rising uppercut.
+    else if(f.id==='kite'&&o.y>14&&d<80&&f.y===0&&!f.move&&f.specialCd===0&&this.random()<l.defense)mask=B.crouch|B.special;
+    else if(danger&&this.random()<l.defense){mask=B.block;const lowThreat=o.move==='low'||(o.id==='kite'&&o.move==='specialFwd')||seen.projectiles.some(p=>p.owner!==this.index&&p.low);if(lowThreat||(o.y===0&&this.random()<.25))mask|=B.crouch;}
     else if(f.move){
       if(f.connected&&this.random()<l.aggression){
         if(f.move==='light')mask=B.light;
-        else if(f.move==='light2'||f.move==='low')mask=B.heavy;
+        else if(f.move==='light2'||f.move==='low')mask=f.meter>=100&&this.random()<.6?B.special|B.heavy:f.meter>=50&&this.random()<.3?B.special|B.light:B.heavy;
         else if(f.move==='heavy')mask=this.random()<.82?B.jump:(f.specialCd===0?B.special:0);
         else if(f.move==='airLight')mask=B.heavy;
         else if(f.move==='airHeavy')mask=B.special;
@@ -34,8 +36,16 @@ export class OpponentAI{
       else if(f.airChain===2)mask=B.special;
       if(d>72)mask|=toward;
     }
-    else if(d>160){mask=toward;if(f.id==='rook'&&f.specialCd===0&&this.random()<.6)mask=B.special;else if(this.random()<.16)mask|=B.dash;}
-    else if(d>l.spacing+FIGHTERS[f.id].moves.heavy.range-45){mask=toward;if(f.id==='kite'&&d<110&&this.random()<.3)mask|=B.dash;else if(this.random()<.08)mask|=B.jump;}
+    else if(d>160){mask=toward;
+      if(f.id==='rook'&&f.meter>=100&&this.random()<.3)mask=B.special|B.heavy;
+      else if(f.id==='rook'&&f.meter>=50&&this.random()<.12)mask=B.special|B.light;
+      else if(f.id==='rook'&&f.specialCd===0&&this.random()<.6)mask=this.random()<.35?B.crouch|B.special:B.special;
+      else if(this.random()<.16)mask|=B.dash;}
+    else if(d>l.spacing+FIGHTERS[f.id].moves.heavy.range-45){mask=toward;
+      // Mid-range tools: Rook's armored charge, Kite's sliding sweep.
+      if(f.specialCd===0&&d<120&&this.random()<.12)mask=toward|B.special;
+      else if(f.id==='kite'&&d<110&&this.random()<.3)mask|=B.dash;else if(this.random()<.08)mask|=B.jump;}
+    else if(f.meter>=100&&this.random()<.18)mask=B.special|B.heavy;
     else if(this.random()<l.aggression){const r=this.random();mask=r<.43?B.light:r<.72?B.heavy:r<.86?B.crouch|B.light:f.specialCd===0?B.special:B.heavy;}
     else mask=this.random()<.55?away:B.block;
     this.mask=mask;return mask;

@@ -63,20 +63,29 @@ Official deployment references: https://render.com/docs/deploy-node-express-app 
 
 | Action | Key |
 | --- | --- |
-| Walk | A / D |
-| Jump | W or Space |
-| Crouch | S |
-| Short forward dash | Shift |
+| Walk | A / D (or ← / →) |
+| Jump | W, Space or ↑ |
+| Crouch | S or ↓ |
+| Dash / back dash | Shift / back + Shift |
 | Light attack | J |
 | Heavy attack | K |
 | Special | L |
-| Hold guard | I |
+| Command specials | Down + Special, Forward + Special |
+| EX special (half meter) | Light + Special |
+| Super (full meter) | Heavy + Special |
+| Guard | Hold away from your rival (or hold I) |
 
-Click **Edit Keys** to change bindings. Changes stay on that browser. Hold crouch and guard to block lows; use standing guard against jumping attacks. There is no chip damage. Air attacks are overheads. Crouch + light performs a low.
+Click **Edit Keys** to change bindings. Changes stay on that browser. Hold down-back to block lows; use standing guard against jumping attacks. Jumping over your rival flips which direction counts as "away". Only EX specials and supers do chip damage. Air attacks are overheads. Crouch + light performs a low.
+
+**Meter.** The bar under your health fills when you hit, get hit or block, and carries over between rounds. Half a bar buys an EX special (Light + Special); a full bar buys a super (Heavy + Special), which freezes the action for a cut-in. Pressing the buttons within two frames counts as together. Specials cancel into supers on hit.
+
+**Command moves.** Kite: Down + Special is a rising uppercut that cannot be hit by air attacks (punishable if blocked); Forward + Special is a low slide. Super: *Skyline Breaker*, an invulnerable rush. Rook: Down + Special sends a quake wave along the floor that must be blocked crouching; Forward + Special is a shoulder charge that absorbs one hit. Super: *Overload Cannon*, a beam that eats normal projectiles.
+
+**Training.** *Training · Dummy* on the menu starts a match with no clock and no KOs. Health refills after each combo and both meters stay full. The footer switches the dummy between stand, block, crouch-block and jump, toggles hitbox display (blue hurtboxes, red hitboxes), and resets positions (or press R).
 
 Try **light → light → special** on the ground. For a six-hit aerial route, use **light → light → heavy → jump → air light → air heavy → air special**, pressing each next button as the hit connects. Jump-cancelled air attacks carry you forward, and direction inputs let you steer through air attacks. Hit cancels only occur on contact, not on a whiff or blocked attack. The chain cannot loop into infinite lights; damage scales down with combo length. The attack and jump buffers are ten frames.
 
-Kite is quick and closes space with a rushing special. Rook is slower, reaches farther, and fires a pulse. Both have 1,000 health, and mirror matches use an alternate palette.
+Kite is quick and closes space with a rushing special that passes through Rook's pulse. Rook is slower, reaches farther, and fires a pulse on a longer cooldown. Both have 1,000 health, and mirror matches use an alternate palette.
 
 ## What is implemented
 
@@ -109,6 +118,10 @@ npm run dev    # starts the Node server; also accepts --port
 Optional environment variables: `PORT` (default 3000); `ALLOWED_ORIGINS` (comma-separated browser origins allowed to open WebSockets). Leave the latter unset for a simple public friend-play server, or include every frontend origin you use. No API key or database is required.
 
 The background in `client/assets/rooftop.png` was created with the built-in image-generation tool from this brief: original 16-bit pixel art nighttime rooftop train station, cyan/indigo skyline and amber windows, level fighting floor, orange kiosk left, pipes right, no characters or HUD. The fighter drawings and sound are original project code.
+
+## October 27 supers update (03)
+
+Super meter, EX specials, supers with cut-ins, two command specials per fighter, armor and anti-air invulnerability, chip damage, projectile clashes, and a training mode with a configurable dummy and hitbox display. The rooftop now has rain, a passing train, flickering signs, wet-floor reflections and a slow-motion KO, and the camera no longer pans past the stage edge. Simulated AI-vs-AI matches stay close to even (Kite wins about 48% on Normal and 56% on Hard).
 
 ## October 9 combat update (02)
 
