@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-03';
-import {OpponentAI} from './shared/ai.mjs?v=20261027-03';
-import {Renderer} from './render.mjs?v=20261027-03';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-04';
+import {OpponentAI} from './shared/ai.mjs?v=20261027-04';
+import {Renderer} from './render.mjs?v=20261027-04';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261027-03';
+$('game').dataset.version='20261027-04';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
 // One-press shortcuts for the two-button meter moves.
 const COMBO={super:B.heavy|B.special,ex:B.light|B.special};

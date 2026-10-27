@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261027-03';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261027-04';
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);
 const easeInOut=v=>{v=clamp01(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
@@ -226,16 +226,15 @@ export class Renderer{
   draw(s,t,{menu=false,selected='kite',paused=false,boxes=false}={}){
     const c=this.ctx;c.save();
     const live=menu?[{...s.fighters[0],id:selected,x:448,y:0,state:'idle',move:null,face:-1,hp:1000}]:s.fighters;
-    const dist=!menu&&live.length>1?Math.abs(live[0].x-live[1].x):260;
+    // The arena fits on one screen, so the camera stays at 1:1 to keep the pixel art sharp. Only big hits punch in briefly.
     const airborne=!menu&&live.length>1?Math.max(live[0].y,live[1].y):0;
-    const closeZoom=!menu?(1+Math.max(0,150-dist)/150*.035+Math.min(airborne,120)/120*.022):1;
-    const zoom=closeZoom+this.cameraPunch;
+    const zoom=1+this.cameraPunch;
     // Keep the camera on the stage: never pan or zoom far enough to show past its edges.
     const halfW=W/2/zoom,halfH=H/2/zoom;
     const focusX=Math.min(W-halfW,Math.max(halfW,!menu&&live.length>1?(live[0].x+live[1].x)/2:W/2));
     const focusY=Math.min(H-halfH,Math.max(halfH,!menu&&live.length>1?FLOOR-44-Math.min(airborne,100)*.23:H/2));
     let sx=0,sy=0;
-    if(this.shake>0&&!this.reduced){sx=Math.sin(t*.19)*this.shake;sy=Math.cos(t*.23)*this.shake*.45;this.shake*=.76;if(this.shake<.18)this.shake=0;}
+    if(this.shake>0&&!this.reduced){sx=Math.round(Math.sin(t*.19)*this.shake);sy=Math.round(Math.cos(t*.23)*this.shake*.45);this.shake*=.76;if(this.shake<.18)this.shake=0;}
     c.translate(W/2+sx,H/2+sy);c.scale(zoom,zoom);c.translate(-focusX,-focusY);
     c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);const stage=this.stageLayer();
     // Smooth only the backdrop: it is a downscaled painting, and nearest-neighbour makes it shimmer as the camera moves.
