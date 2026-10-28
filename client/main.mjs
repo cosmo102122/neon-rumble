@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-01';
-import {OpponentAI} from './shared/ai.mjs?v=20261028-01';
-import {Renderer} from './render.mjs?v=20261028-01';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-02';
+import {OpponentAI} from './shared/ai.mjs?v=20261028-02';
+import {Renderer} from './render.mjs?v=20261028-02';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261028-01';
+$('game').dataset.version='20261028-02';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
 // One-press shortcuts for the two-button meter moves.
 const COMBO={super:B.heavy|B.special,ex:B.light|B.special},COMBO_COST={super:100,ex:50};
@@ -17,7 +17,11 @@ let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,list
 for(const k of ['super','ex'])if(Object.entries(bindings).some(([n,c])=>n!==k&&c===bindings[k]))bindings[k]='';
 const DUMMY_MODES=['STAND','BLOCK','CROUCH BLOCK','JUMP'];let training=false,dummyMode=0,showBoxes=false;
 let mode='menu',state=createMatch([selected,'rook']),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
-let serverBase=stored('nr-server','');const params=new URLSearchParams(location.search);const embedded=window.self!==window.top||params.get('embed')==='1';if(embedded)document.documentElement.classList.add('embedded');const suppliedServer=params.get('server');
+// Static hosts (neonrumble.top, GitHub Pages, Google Sites embeds) can't run the room server, so they use the hosted one.
+// The Node server serves the page itself, so pages it serves (localhost, the server's own domain) talk to their own origin.
+const HOSTED_SERVER='https://play.neonrumble.top';
+const servesItself=['localhost','127.0.0.1','play.neonrumble.top'].includes(location.hostname)||location.hostname.endsWith('.onrender.com');
+let serverBase=stored('nr-server','')||(servesItself?'':HOSTED_SERVER);const params=new URLSearchParams(location.search);const embedded=window.self!==window.top||params.get('embed')==='1';if(embedded)document.documentElement.classList.add('embedded');const suppliedServer=params.get('server');
 if(suppliedServer){try{const u=new URL(suppliedServer);if(u.protocol==='https:'){serverBase=u.origin;save('nr-server',serverBase);}}catch{}}
 if(params.get('room'))$('roomInput').value=params.get('room').toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6);
 let savedSession;try{savedSession=JSON.parse(sessionStorage.getItem('nr-session'));}catch{}
@@ -43,10 +47,20 @@ document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListene
 function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=id==='kite'?'01 / 02':'02 / 02';}
 document.querySelectorAll('[data-fighter]').forEach(b=>b.onclick=()=>choose(b.dataset.fighter));choose(selected);
 function endpoint(){const u=new URL(serverBase||location.origin);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.pathname='/ws';u.search='';return u.href;}
+async function pingServer(timeout=6000){try{const r=await fetch((serverBase||'')+'/health',{signal:AbortSignal.timeout(timeout),cache:'no-store'});const data=await r.json();return data.game==='neon-rumble'&&!!data.ok;}catch{return false;}}
 async function checkServer(){
   $('networkStatus').textContent='CHECKING SERVER';
-  try{const r=await fetch((serverBase||'')+'/health',{signal:AbortSignal.timeout(6000)});const data=await r.json();serverReady=data.game==='neon-rumble'&&data.ok;}catch{serverReady=false;}
-  $('networkStatus').textContent=serverReady?'ONLINE SERVER READY':'AI READY · SERVER NEEDED';
+  serverReady=await pingServer();
+  $('networkStatus').textContent=serverReady?'ONLINE SERVER READY':'AI READY · SERVER WAKING';
+}
+// A free-tier host sleeps when idle and takes up to a minute to wake: keep asking instead of failing.
+async function wakeServer(){
+  if(serverReady||await pingServer())return serverReady=true;
+  const until=Date.now()+75000;let n=0;
+  while(Date.now()<until){n++;notice(`Waking up the online server — this can take up to a minute the first time… (${n*5}s)`);$('networkStatus').textContent='WAKING SERVER';
+    if(await pingServer(5000)){serverReady=true;$('networkStatus').textContent='ONLINE SERVER READY';notice('');return true;}
+    await new Promise(r=>setTimeout(r,1000));}
+  $('networkStatus').textContent='AI READY · SERVER OFFLINE';return false;
 }
 function connect(){
   if(socket?.readyState===1)return Promise.resolve();
@@ -82,9 +96,9 @@ function onMessage(m){
 function renderLobby(){if(!room)return;$('players').replaceChildren();for(let i=0;i<2;i++){const p=room.players[i],div=document.createElement('div');div.className='player-slot'+(p?.ready?' is-ready':'');const strong=document.createElement('strong');strong.textContent=p?FIGHTERS[p.fighter].name:'OPEN SLOT';div.append(strong,document.createTextNode(p?(p.ready?'READY':i===myIndex?'YOU':'CONNECTED'):'WAITING…'));$('players').append(div);}$('ready').textContent=room.players[myIndex]?.ready?'READY — WAITING FOR RIVAL':'READY TO FIGHT';}
 function setScreen(){const playing=mode==='ai'||mode==='online';show('menu',mode==='menu');show('lobby',mode==='lobby');show('hud',playing);show('fightFooter',playing);show('pause',playing&&(networkPause||reconnecting));$('screen').classList.toggle('playing',playing);const result=playing&&['matchOver','forfeit'].includes(confirmed.phase);show('result',result);if(result){const w=confirmed.winner;$('resultLabel').textContent=confirmed.phase==='forfeit'?'MATCH ENDED · '+confirmed.roundReason.toUpperCase():'MATCH COMPLETE';$('resultTitle').textContent=w<0?'NO CONTEST':w===myIndex?'YOU WIN':'RIVAL WINS';$('resultScore').textContent=`${FIGHTERS[confirmed.fighters[0].id].name}  ${confirmed.wins[0]} — ${confirmed.wins[1]}  ${FIGHTERS[confirmed.fighters[1].id].name}`;if(lastMatchShown!==confirmed.matchId){lastMatchShown=confirmed.matchId;clearInput();}}$('matchMode').textContent=training?'TRAINING':mode==='ai'?`PRACTICE / ${$('difficulty').value.toUpperCase()}`:`ROOM ${room?.code??''} / YOU ARE P${myIndex+1}`;}
 function updateHUD(){const s=confirmed;const key=`${s.matchId}|${s.phase}|${Math.ceil(s.timer/60)}|${s.fighters.map(f=>f.hp)}|${s.wins}|${s.round}|${myIndex}|${s.fighters.map(f=>f.id)}|${s.fighters.map(f=>Math.floor(f.meter??0))}|${training}`;if(key===lastHud)return;lastHud=key;for(let i=0;i<2;i++){$('name'+i).textContent=FIGHTERS[s.fighters[i].id].name;$('tag'+i).textContent=i===myIndex?'YOU':training?'DUMMY':mode==='ai'?'CPU':'RIVAL';const mtr=Math.floor(s.fighters[i].meter??0);$('meter'+i).style.width=mtr+'%';$('meterBar'+i).classList.toggle('half',mtr>=50&&mtr<100);$('meterBar'+i).classList.toggle('full',mtr>=100);$('meterLabel'+i).textContent=mtr>=100?'SUPER READY'+(i===myIndex?' · PRESS '+label(bindings.super):''):mtr>=50?'EX READY'+(i===myIndex?' · PRESS '+label(bindings.ex):''):'';$('health'+i).style.width=Math.max(0,s.fighters[i].hp/10)+'%';$('health'+i).parentElement.setAttribute('aria-label',`${FIGHTERS[s.fighters[i].id].name} health ${s.fighters[i].hp} of 1000`);$('wins'+i).innerHTML=[0,1].map(n=>`<span class="${n<s.wins[i]?'won':''}"></span>`).join('');}{const mm=Math.floor(s.fighters[myIndex].meter??0);setGuide(mm>=100?'super':mm>=50?'ex':'combo');}$('timer').textContent=s.training?'∞':Math.max(0,Math.ceil(s.timer/60)).toString().padStart(2,'0');$('round').textContent='ROUND '+s.round;setScreen();}
-async function roomAction(type,code){clearInput();sound.unlock();notice('Connecting to the room server…');$('create').disabled=true;try{await connect();send({type,fighter:selected,...(code?{code}:{})});}catch(e){notice(e.message);$('serverDialog').showModal();$('serverUrl').value=serverBase;}finally{$('create').disabled=false;}}
+async function roomAction(type,code){clearInput();sound.unlock();notice('Connecting to the room server…');$('create').disabled=true;try{if(!await wakeServer())throw new Error('The online server is not responding. Try again in a minute.');notice('Connecting to the room server…');await connect();send({type,fighter:selected,...(code?{code}:{})});}catch(e){notice(e.message);$('serverDialog').showModal();$('serverUrl').value=serverBase;}finally{$('create').disabled=false;}}
 $('create').onclick=()=>roomAction('create');$('joinForm').onsubmit=e=>{e.preventDefault();roomAction('join',$('roomInput').value.trim().toUpperCase());};$('ready').onclick=()=>send({type:'ready'});
-$('copyInvite').onclick=async()=>{const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('room',room.code);if(serverBase)u.searchParams.set('server',serverBase);try{await navigator.clipboard.writeText(u.href);$('copyInvite').textContent='COPIED — SEND IT TO YOUR RIVAL';}catch{notice('Invite link: '+u.href);}};
+$('copyInvite').onclick=async()=>{const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('room',room.code);if(serverBase&&serverBase!==HOSTED_SERVER)u.searchParams.set('server',serverBase);try{await navigator.clipboard.writeText(u.href);$('copyInvite').textContent='COPIED — SEND IT TO YOUR RIVAL';}catch{notice('Invite link: '+u.href);}};
 function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,selected==='kite'?'rook':'kite'],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();if(training)notice(`Training: your meter stays full. Press ${label(bindings.super)} for your SUPER, ${label(bindings.ex)} for an EX special, and try Down/Forward + ${label(bindings.special)}.`);$('game').focus();}
 $('practice').onclick=()=>startAI(false);$('training').onclick=()=>startAI(true);$('tryUpdate').onclick=()=>startAI(true);
 // Training dummy: stands still by default; can guard (high or low) or hop so you can test overheads and anti-airs.
