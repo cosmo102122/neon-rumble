@@ -162,3 +162,30 @@ test("Kite's slide passes under Rook's pulse", () => {
   s.fighters[0].x = s.projectiles[0].x-60; step(s,[B.right|B.special,0]);
   for(let i=0;i<14;i++){step(s,[0,0]);assert.equal(s.fighters[0].stun,0);}
 });
+
+// ---- Brick: grabs ----
+function vsBrick(other='kite',gap=30){const s=createMatch(['brick',other]);s.phase='fight';s.fighters[0].x=300;s.fighters[1].x=300+gap;return s;}
+test("Brick's grab goes through blocking but misses jumpers and stunned targets", () => {
+  let s = vsBrick(); step(s,[B.special,B.right]); for(let i=0;i<12;i++)step(s,[0,B.right]);
+  assert.ok(s.fighters[1].hp<1000,'a blocking opponent still gets grabbed');
+  assert.ok(s.events.some(e=>e.type==='hit'&&e.grab));
+  s = vsBrick(); s.fighters[1].y=20; s.fighters[1].vy=3; step(s,[B.special,0]); for(let i=0;i<10;i++)step(s,[0,0]);
+  assert.equal(s.fighters[1].hp,1000,'a jumping opponent cannot be grabbed');
+  s = vsBrick(); s.fighters[1].blockstun=20; step(s,[B.special,0]); for(let i=0;i<10;i++)step(s,[0,0]);
+  assert.equal(s.fighters[1].hp,1000,'no grabs during blockstun');
+});
+test("Brick's grab beats Rook's armored charge; his stomp hits low and his splash is an overhead", () => {
+  let s = vsBrick('rook',50); step(s,[0,B.left|B.special]); for(let i=0;i<3;i++)step(s,[0,0]); step(s,[B.special,0]); for(let i=0;i<14;i++)step(s,[0,0]);
+  assert.ok(s.events.some(e=>e.type==='hit'&&e.grab),'grab lands through armor');
+  assert.equal(s.events.some(e=>e.type==='armor'),false);
+  s = vsBrick('kite',50); step(s,[B.crouch|B.special,B.right]); for(let i=0;i<30;i++)step(s,[0,B.right]);
+  assert.ok(s.fighters[1].hp<1000,'standing guard loses to the low stomp');
+  s = vsBrick('kite',70); step(s,[B.right|B.special,B.right|B.crouch]); for(let i=0;i<30;i++)step(s,[0,B.right|B.crouch]);
+  assert.ok(s.fighters[1].hp<1000,'crouch guard loses to the overhead splash');
+});
+test('Brick super: full bar, invulnerable grab with a cut-in', () => {
+  const s = vsBrick(); s.fighters[0].meter=100; step(s,[B.heavy|B.special,0]);
+  assert.equal(s.fighters[0].move,'super'); assert.ok(s.events.some(e=>e.type==='super'&&e.label==='LAST STOP'));
+  for(let i=0;i<70;i++)step(s,[0,0]);
+  assert.ok(s.fighters[1].hp<=1000-300);
+});

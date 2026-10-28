@@ -5,7 +5,7 @@ export const METER_MAX = 100, EX_COST = 50, SUPER_FREEZE = 40;
 // Move fields beyond frame data:
 //   cd: special cooldown it starts · invuln: 'all' | 'air' | 'proj' during startup+active · armor: absorbs one hit
 //   aa: tall anti-air hitbox · projectile: spawns a projectile (speed, pw/ph size, low, kind) · chip: damage dealt through a block
-//   label: on-screen name for supers
+//   label: on-screen name for supers · grab: unblockable, beats armor, misses airborne or stunned targets
 export const FIGHTERS = {
   kite: { name:'KITE', title:'The rooftop runner', style:'Fast pressure · close range', speed:2.8, jump:8.2, color:'#ff9548', specialCd:66,
     moves:{
@@ -17,7 +17,7 @@ export const FIGHTERS = {
       // Rising uppercut: beats jump-ins, very punishable if it whiffs or is blocked.
       specialDown:{startup:4,active:7,recovery:30,damage:118,stun:32,blockstun:16,range:34,kb:1.4,launchY:7.4,aa:true,invuln:'air',cd:45},
       // Sliding sweep: travels in low under pulses' arc and must be blocked crouching.
-      specialFwd:{startup:8,active:9,recovery:22,damage:92,stun:26,blockstun:14,range:40,kb:3.4,lunge:4.6,low:true,cd:50},
+      specialFwd:{startup:8,active:9,recovery:26,damage:92,stun:26,blockstun:14,range:40,kb:3.4,lunge:4.6,low:true,cd:70},
       exSpecial:{startup:8,active:10,recovery:22,damage:180,stun:36,blockstun:20,range:52,kb:6,lunge:5.4,invuln:'all',launchY:5.5,chip:18},
       super:{startup:6,active:12,recovery:34,damage:300,stun:60,blockstun:24,range:56,kb:7,lunge:6.5,invuln:'all',launchY:8.5,chip:60,label:'SKYLINE BREAKER'},
       low:{startup:7,active:3,recovery:17,damage:68,stun:22,blockstun:12,range:44,kb:1.8,low:true},
@@ -41,6 +41,25 @@ export const FIGHTERS = {
       airLight:{startup:7,active:5,recovery:11,damage:64,stun:22,blockstun:11,range:51,kb:1.3,juggleY:1.2,overhead:true},
       airHeavy:{startup:10,active:6,recovery:15,damage:92,stun:27,blockstun:14,range:60,kb:2.3,juggleY:2.1,overhead:true},
       airSpecial:{startup:12,active:6,recovery:19,damage:126,stun:31,blockstun:17,range:65,kb:4.1,juggleY:-4.1,overhead:true,finisher:true}
+    }},
+  // Brick: slow, wide grappler. His grabs make blocking risky up close; his tools for getting in are armor and an overhead splash.
+  brick: { name:'BRICK',title:'The rooftop wrecker',style:'Grappler · command grabs',speed:2.05,jump:7.4,color:'#9be22d', specialCd:55, width:30,
+    moves:{
+      light:{startup:6,active:3,recovery:15,damage:72,stun:20,blockstun:11,range:40,kb:1.8},
+      light2:{startup:8,active:3,recovery:17,damage:80,stun:23,blockstun:13,range:44,kb:2.2},
+      heavy:{startup:14,active:5,recovery:25,damage:136,stun:34,blockstun:18,range:62,kb:2.6,launchY:5.8},
+      // Rooftop Drop: command grab.
+      special:{startup:6,active:3,recovery:34,damage:165,stun:40,blockstun:0,range:40,kb:3.2,launchY:7,grab:true},
+      // Shockstomp: armored ground pound that hits low.
+      specialDown:{startup:16,active:5,recovery:24,damage:96,stun:28,blockstun:16,range:62,kb:3,low:true,armor:true,cd:70},
+      // Freight Splash: leaping body splash, an overhead that sails over projectiles.
+      specialFwd:{startup:12,active:9,recovery:24,damage:118,stun:30,blockstun:18,range:46,kb:4.2,lunge:3.8,overhead:true,invuln:'proj'},
+      exSpecial:{startup:4,active:4,recovery:30,damage:215,stun:44,blockstun:0,range:44,kb:3.5,launchY:7.5,grab:true,invuln:'all'},
+      super:{startup:4,active:5,recovery:40,damage:330,stun:60,blockstun:0,range:52,kb:4,launchY:9,grab:true,invuln:'all',label:'LAST STOP'},
+      low:{startup:9,active:4,recovery:20,damage:80,stun:24,blockstun:13,range:46,kb:2.2,low:true},
+      airLight:{startup:7,active:5,recovery:12,damage:66,stun:22,blockstun:11,range:44,kb:1.3,juggleY:1.3,overhead:true},
+      airHeavy:{startup:10,active:6,recovery:16,damage:96,stun:27,blockstun:14,range:52,kb:2.3,juggleY:2.2,overhead:true},
+      airSpecial:{startup:11,active:7,recovery:20,damage:130,stun:32,blockstun:17,range:58,kb:4.2,juggleY:-4.2,overhead:true,finisher:true}
     }}
 };
 const SPECIALS=['special','specialDown','specialFwd'];
@@ -62,7 +81,7 @@ const gain=(f,n)=>{f.meter=Math.min(METER_MAX,f.meter+n);};
 export function hurtbox(f) {
   // Kite's slide is low enough to pass under pulses (their box bottoms out 31px above the floor).
   if(f.y===0&&f.id==='kite'&&f.move==='specialFwd')return{x:f.x-14,y:FLOOR-22,w:28,h:22};
-  const crouch=f.y===0&&(f.state==='crouch'||f.state==='blockLow'||f.move==='low');return{x:f.x-12,y:FLOOR-f.y-(crouch?39:65),w:24,h:crouch?39:65};}
+  const crouch=f.y===0&&(f.state==='crouch'||f.state==='blockLow'||f.move==='low'),w=FIGHTERS[f.id].width??24;return{x:f.x-w/2,y:FLOOR-f.y-(crouch?39:65),w,h:crouch?39:65};}
 export function hitbox(f) {
   const m=FIGHTERS[f.id].moves[f.move];
   if(!m||m.projectile||f.mf<m.startup||f.mf>=m.startup+m.active)return null;
@@ -181,6 +200,8 @@ function physics(s,f,frozen){
   if(frozen||f.vx!==0){f.x+=f.vx;f.vx*=0.82;if(Math.abs(f.vx)<0.06)f.vx=0;}
   f.x=clamp(f.x,24,W-24);
 }
+// Grabs only catch a grounded opponent who isn't already reeling (no grabs inside combos or blockstun).
+function grabMisses(f,d){return !!FIGHTERS[f.id].moves[f.move]?.grab&&(d.y>0||d.stun>0||d.blockstun>0);}
 // Which hits a defender's current move is immune to.
 function immune(d,attacker,fromProjectile){
   const m=d.move&&FIGHTERS[d.id].moves[d.move];
@@ -193,7 +214,7 @@ function applyHit(s,attackerIndex,defenderIndex,m,originX) {
   // Holding away from the hit's origin guards; a cross-up flips which direction counts as "away".
   const away=originX>=d.x?B.left:B.right;
   const guarding=d.y===0&&!d.move&&d.stun===0&&d.dash===0&&(((d.input&B.block)&&facing)||(d.input&away));
-  const blocked=guarding&&(!m.low||d.input&B.crouch)&&(!m.overhead||!(d.input&B.crouch));
+  const blocked=!m.grab&&guarding&&(!m.low||d.input&B.crouch)&&(!m.overhead||!(d.input&B.crouch));
   if(blocked){
     d.blockstun=m.blockstun;d.vx=(d.x>=originX?1:-1)*m.kb*0.5;d.state=d.input&B.crouch?'blockLow':'block';s.hitstop=Math.max(s.hitstop,3);
     if(m.chip)d.hp=Math.max(0,d.hp-m.chip);
@@ -202,7 +223,7 @@ function applyHit(s,attackerIndex,defenderIndex,m,originX) {
     return;
   }
   const dm=d.move&&FIGHTERS[d.id].moves[d.move];
-  if(dm?.armor&&!d.armorUsed&&d.mf<dm.startup+dm.active){
+  if(!m.grab&&dm?.armor&&!d.armorUsed&&d.mf<dm.startup+dm.active){
     // Armor: take reduced damage, keep going.
     const dmg=Math.round(m.damage*.5);d.hp=Math.max(0,d.hp-dmg);d.armorUsed=true;s.hitstop=Math.max(s.hitstop,5);gain(d,6);
     emit(s,'armor',{p:defenderIndex,x:d.x,y:FLOOR-d.y-40,damage:dmg});
@@ -225,7 +246,7 @@ function applyHit(s,attackerIndex,defenderIndex,m,originX) {
   if(!isSuper&&!m.ex&&a.move!=="exSpecial")gain(a,damage*.08);
   gain(d,damage*.05);
   a.connected=true;a.combo=combo;a.comboAge=80;s.hitstop=Math.max(s.hitstop,isSuper?14:m.finisher?8:m.damage>=100?6:4);
-  emit(s,'hit',{p:defenderIndex,by:attackerIndex,damage,combo,x:d.x,y:FLOOR-d.y-40,heavy:m.damage>=100,airborne:d.y>0,finisher:!!m.finisher||!!isSuper,super:!!isSuper,ko});
+  emit(s,'hit',{p:defenderIndex,by:attackerIndex,damage,combo,x:d.x,y:FLOOR-d.y-40,heavy:m.damage>=100,airborne:d.y>0,finisher:!!m.finisher||!!isSuper,super:!!isSuper,grab:!!m.grab,ko});
 }
 function holdInputs(s,masks,pressed){
   s.fighters.forEach((f,i)=>{if(pressed[i]&ATK){f.buffer=(f.bufferAge>=8?f.buffer:0)|(pressed[i]&ATK);f.bufferAge=10;}if(pressed[i]&B.jump)f.jumpBufferAge=10;f.prev=masks[i];});
@@ -256,7 +277,7 @@ export function step(s, masks=[0,0], edges) {
   if(Math.abs(a.y-b.y)<48&&Math.abs(a.x-b.x)<26){const dir=b.x>=a.x?1:-1;const push=(26-Math.abs(a.x-b.x))/2;a.x=clamp(a.x-dir*push,24,W-24);b.x=clamp(b.x+dir*push,24,W-24);}
   // Collect contacts first, then resolve: simultaneous hits can trade fairly.
   const contacts=[];
-  for(let i=0;i<2;i++){const f=s.fighters[i],d=s.fighters[1-i],box=hitbox(f);if(box&&!f.hit&&!immune(d,f,false)&&intersects(box,hurtbox(d))){f.hit=true;contacts.push([i,1-i,{...FIGHTERS[f.id].moves[f.move]},f.x]);}}
+  for(let i=0;i<2;i++){const f=s.fighters[i],d=s.fighters[1-i],box=hitbox(f);if(box&&!f.hit&&!immune(d,f,false)&&!grabMisses(f,d)&&intersects(box,hurtbox(d))){f.hit=true;contacts.push([i,1-i,{...FIGHTERS[f.id].moves[f.move]},f.x]);}}
   for(const p of s.projectiles){
     p.x+=p.vx;p.life--;const d=s.fighters[1-p.owner];
     if(p.life>0&&!immune(d,s.fighters[p.owner],true)&&intersects(projectileBox(p),hurtbox(d))){contacts.push([p.owner,1-p.owner,p,p.x]);p.life=0;}

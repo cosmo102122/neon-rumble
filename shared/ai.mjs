@@ -1,4 +1,4 @@
-import {B,FIGHTERS} from './engine.mjs?v=20261028-03';
+import {B,FIGHTERS} from './engine.mjs?v=20261028-04';
 export const LEVELS={easy:{reaction:30,decision:20,defense:.23,spacing:36,aggression:.58},normal:{reaction:18,decision:12,defense:.52,spacing:42,aggression:.77},hard:{reaction:10,decision:8,defense:.72,spacing:47,aggression:.89}};
 export class OpponentAI{
   constructor(level='normal',index=1,seed=1897){this.level=LEVELS[level]??LEVELS.normal;this.index=index;this.seed=seed;this.history=[];this.next=0;this.mask=0;}
@@ -20,7 +20,7 @@ export class OpponentAI{
     if(pulse&&f.id==='kite'&&!f.move&&f.y===0&&this.random()<l.defense)mask=f.specialCd===0&&d<150?B.special:B.jump|toward;
     // Kite swats jump-ins with the rising uppercut.
     else if(f.id==='kite'&&o.y>14&&d<80&&f.y===0&&!f.move&&f.specialCd===0&&this.random()<l.defense)mask=B.crouch|B.special;
-    else if(danger&&this.random()<l.defense){mask=B.block;const lowThreat=o.move==='low'||(o.id==='kite'&&o.move==='specialFwd')||seen.projectiles.some(p=>p.owner!==this.index&&p.low);if(lowThreat||(o.y===0&&this.random()<.25))mask|=B.crouch;}
+    else if(danger&&this.random()<l.defense){mask=B.block;const lowThreat=!!(o.move&&FIGHTERS[o.id].moves[o.move]?.low)||seen.projectiles.some(p=>p.owner!==this.index&&p.low);if(lowThreat||(o.y===0&&this.random()<.25))mask|=B.crouch;}
     else if(f.move){
       if(f.connected&&this.random()<l.aggression){
         if(f.move==='light')mask=B.light;
@@ -46,6 +46,8 @@ export class OpponentAI{
       if(f.specialCd===0&&d<120&&this.random()<.12)mask=toward|B.special;
       else if(f.id==='kite'&&d<110&&this.random()<.3)mask|=B.dash;else if(this.random()<.08)mask|=B.jump;}
     else if(f.meter>=100&&this.random()<.18)mask=B.special|B.heavy;
+    // Brick looks for grabs up close, especially against a grounded, idle or blocking opponent.
+    else if(f.id==='brick'&&d<42&&o.y===0&&!o.stun&&f.specialCd===0&&this.random()<.4)mask=f.meter>=50&&this.random()<.3?B.special|B.light:B.special;
     else if(this.random()<l.aggression){const r=this.random();mask=r<.43?B.light:r<.72?B.heavy:r<.86?B.crouch|B.light:f.specialCd===0?B.special:B.heavy;}
     else mask=this.random()<.55?away:B.block;
     this.mask=mask;return mask;

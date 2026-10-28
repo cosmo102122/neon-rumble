@@ -66,3 +66,5 @@ html.embedded .screen{border-top:1px solid #26354a}
 .touch-pad .meter-btn{border-color:#ffd23f}.touch-pad .meter-btn.locked{opacity:.3}
 .pad-dirs{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px)}.t-up{grid-column:2;grid-row:1}.t-left{grid-column:1;grid-row:2}.t-right{grid-column:3;grid-row:2}.t-down{grid-column:2;grid-row:3}
 .pad-btns{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-items:center}
+
+.fighter-select{flex-wrap:wrap}.fighter{min-width:0}.fighter strong{font-size:14px}

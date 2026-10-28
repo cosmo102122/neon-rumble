@@ -81,13 +81,13 @@ Click **Edit Keys** to change bindings. Changes stay on that browser. Hold down-
 
 **Meter.** The bar under your health fills when you hit, get hit or block, and carries over between rounds. Half a bar buys an EX special (Light + Special); a full bar buys a super (Heavy + Special), which freezes the action for a cut-in. Pressing the buttons within two frames counts as together. Specials cancel into supers on hit.
 
-**Command moves.** Kite: Down + Special is a rising uppercut that cannot be hit by air attacks (punishable if blocked); Forward + Special is a low slide. Super: *Skyline Breaker*, an invulnerable rush. Rook: Down + Special sends a quake wave along the floor that must be blocked crouching; Forward + Special is a shoulder charge that absorbs one hit. Super: *Overload Cannon*, a beam that eats normal projectiles.
+**Command moves.** Kite: Down + Special is a rising uppercut that cannot be hit by air attacks (punishable if blocked); Forward + Special is a low slide. Super: *Skyline Breaker*, an invulnerable rush. Rook: Down + Special sends a quake wave along the floor that must be blocked crouching; Forward + Special is a shoulder charge that absorbs one hit. Super: *Overload Cannon*, a beam that eats normal projectiles. Brick (grappler): Special is *Rooftop Drop*, a command grab that ignores blocking and armor but misses anyone airborne or already stunned; Down + Special is an armored low stomp; Forward + Special is an overhead body splash that sails over projectiles. Super: *Last Stop*, an invulnerable grab.
 
 **Training.** *Training · Dummy* on the menu starts a match with no clock and no KOs. Health refills after each combo and both meters stay full. The footer switches the dummy between stand, block, crouch-block and jump, toggles hitbox display (blue hurtboxes, red hitboxes), and resets positions (or press R).
 
 Try **light → light → special** on the ground. For a six-hit aerial route, use **light → light → heavy → jump → air light → air heavy → air special**, pressing each next button as the hit connects. Jump-cancelled air attacks carry you forward, and direction inputs let you steer through air attacks. Hit cancels only occur on contact, not on a whiff or blocked attack. The chain cannot loop into infinite lights; damage scales down with combo length. The attack and jump buffers are ten frames.
 
-Kite is quick and closes space with a rushing special that passes through Rook's pulse. Rook is slower, reaches farther, and fires a pulse on a longer cooldown. Both have 1,000 health, and mirror matches use an alternate palette.
+Three fighters. Kite is quick and closes space with a rushing special that passes through Rook's pulse. Rook is slower, reaches farther, and fires a pulse on a longer cooldown. Both have 1,000 health, and mirror matches use an alternate palette.
 
 ## What is implemented
 
@@ -123,7 +123,7 @@ The background in `client/assets/rooftop.png` was created with the built-in imag
 
 ## October 27 supers update (03)
 
-Super meter, EX specials, supers with cut-ins, two command specials per fighter, armor and anti-air invulnerability, chip damage, projectile clashes, and a training mode with a configurable dummy and hitbox display. The rooftop now has rain, a passing train, flickering signs, wet-floor reflections and a slow-motion KO, and the camera no longer pans past the stage edge. Simulated AI-vs-AI matches stay close to even (Kite wins about 48% on Normal and 56% on Hard).
+Super meter, EX specials, supers with cut-ins, two command specials per fighter, armor and anti-air invulnerability, chip damage, projectile clashes, and a training mode with a configurable dummy and hitbox display. The rooftop now has rain, a passing train, flickering signs, wet-floor reflections and a slow-motion KO, and the camera no longer pans past the stage edge. Simulated AI-vs-AI matches stay close to even.
 
 ## October 9 combat update (02)
 

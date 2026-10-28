@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-03';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-04';
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);
 const easeInOut=v=>{v=clamp01(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
@@ -19,9 +19,10 @@ function impactRing(ctx,x,y,r,color,alpha=1,width=2){
 // body/dark/light = main outfit; trim = secondary outfit color; accent/glow = bright highlights.
 const palettes={
   kite:{ink:'#140a1e',body:'#ff6a2b',dark:'#c2321f',light:'#ffb35c',trim:'#ffd23f',shirt:'#e8367f',skin:'#f7b98a',skinDark:'#d07a5e',pants:'#3b2d86',pantsLight:'#5b49c4',hair:'#6b1d6e',hairLight:'#ff5fb0',glove:'#e8273c',boot:'#f4f6fb',sole:'#2fd6f0',accent:'#2fd6f0',glow:'#fff27a'},
+  brick:{ink:'#100b10',body:'#8fd62b',dark:'#4a7d14',light:'#d4ff8f',trim:'#ff3d8b',shirt:'#8fd62b',skin:'#b0703f',skinDark:'#7d4724',pants:'#2a2f3d',pantsLight:'#444c61',hair:'#ff3d8b',hairLight:'#ffa3c9',glove:'#ece6d4',boot:'#4a3424',sole:'#ffcc33',accent:'#ffcc33',glow:'#fff27a',beard:'#2b1a12'},
   rook:{ink:'#071423',body:'#25bfc4',dark:'#11697c',light:'#9ffff0',trim:'#ff9f2e',shirt:'#24315e',skin:'#c99474',skinDark:'#8a5f5c',pants:'#1f2a5c',pantsLight:'#34428c',hair:'#eef3ff',hairLight:'#ffffff',glove:'#11697c',boot:'#46607e',sole:'#ff9f2e',accent:'#6dfff2',glow:'#c08cff'}
 };
-const alts={kite:{body:'#9d6bff',dark:'#5a32b8',light:'#d2b6ff',trim:'#5ff7d2',shirt:'#ffd23f',hair:'#14365e',hairLight:'#5ff7d2',glove:'#2b8cff',pants:'#2a3a3f',pantsLight:'#3e5961'},
+const alts={brick:{body:'#ff7a1a',dark:'#a3480b',light:'#ffc08a',trim:'#2bd4ff',hair:'#2bd4ff',hairLight:'#a6f0ff',pants:'#1c2b3f',pantsLight:'#33476a'},kite:{body:'#9d6bff',dark:'#5a32b8',light:'#d2b6ff',trim:'#5ff7d2',shirt:'#ffd23f',hair:'#14365e',hairLight:'#5ff7d2',glove:'#2b8cff',pants:'#2a3a3f',pantsLight:'#3e5961'},
   rook:{body:'#e04f8e',dark:'#8c2156',light:'#ffc2dc',trim:'#ffe066',accent:'#ffe066',glow:'#7ff1ff',glove:'#8c2156',pants:'#2c1d48',pantsLight:'#4a3375'}};
 const shadeCache=new Map();
 // Mix a hex color toward white (amt>0) or black (amt<0) for highlights and shadows.
@@ -29,7 +30,7 @@ function shade(hex,amt){const key=hex+amt;if(shadeCache.has(key))return shadeCac
   const n=parseInt(hex.slice(1,7),16),c=[n>>16,n>>8&255,n&255].map(v=>Math.round(amt>0?v+(255-v)*amt:v*(1+amt)));
   const out='#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');shadeCache.set(key,out);return out;}
 // Bone lengths and rest heights. Rook is taller and broader than Kite.
-const RIG={kite:{thigh:15,shin:15,upper:12,fore:13,torso:17,hip:-30,chest:-47,head:-57},rook:{thigh:16,shin:16,upper:13,fore:14,torso:23,hip:-32,chest:-51,head:-62}};
+const RIG={brick:{thigh:16,shin:15,upper:13,fore:14,torso:27,hip:-30,chest:-49,head:-60},kite:{thigh:15,shin:15,upper:12,fore:13,torso:17,hip:-30,chest:-47,head:-57},rook:{thigh:16,shin:16,upper:13,fore:14,torso:23,hip:-32,chest:-51,head:-62}};
 // Two-bone IK: returns [joint, end]. `prefer` picks which of the two bend solutions to use.
 function ik(a,b,l1,l2,prefer){
   let dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy)||.001;const max=l1+l2-.5;
@@ -52,8 +53,12 @@ function pose(f,t,r){
   if(f.move){const m=FIGHTERS[f.id].moves[f.move],a=m.startup,b=a+m.active;
     // Wind-up pulls back, active snaps out, recovery eases home over 8 frames.
     const e=f.mf>=a&&f.mf<b?1:f.mf>=b?Math.max(0,1-(f.mf-b)/8):-.3*Math.min(1,f.mf/Math.max(1,a));
-    const rook=f.id==='rook';
-    if(f.move==='light'){P.fh=[17+19*e,r.chest+1];shift('chest',3*e);shift('head',2*e);}
+    const rook=f.id==='rook',brick=f.id==='brick';
+    if(brick&&f.move==='heavy'){P.fh=[16+8*e,r.chest-16+28*e];P.bh=[12+8*e,r.chest-14+28*e];shift('chest',4*e,3*e);shift('head',5*e,4*e);P.bf=[-15,-1];}
+    else if(brick&&['special','exSpecial','super'].includes(f.move)){P.fh=[18+16*e,r.chest+1];P.bh=[15+16*e,r.chest+6];shift('chest',6*e,2*e);shift('head',6*e,2*e);P.bf=[-17,-1];P.ff=[14,-1];P.fx=f.move==='special'?0:e;}
+    else if(brick&&f.move==='specialDown'){const down=f.mf>=m.startup;P.ff=down?[16,-1]:[12,-24];P.fh=down?[14,r.chest+18]:[10,r.chest-14];P.bh=down?[6,r.chest+16]:[4,r.chest-16];shift('hip',0,down?6:0);shift('chest',2,down?8:0);shift('head',2,down?8:0);P.fx=down?1:0;}
+    else if(brick&&(f.move==='specialFwd'||f.move==='airSpecial')){const k=Math.max(0,e);set({hip:[-2,r.hip-4],chest:[10*k,r.chest+10*k],head:[15*k,r.head+14*k],bf:[-18,-12],ff:[-4,-8],fh:[26,r.chest+6],bh:[20,r.chest-4]});}
+    else if(f.move==='light'){P.fh=[17+19*e,r.chest+1];shift('chest',3*e);shift('head',2*e);}
     else if(f.move==='light2'){P.bh=[17+20*e,r.chest+2];P.fh=[12,r.chest-4];shift('chest',5*e);shift('head',4*e);shift('hip',2*e);}
     else if(f.move==='heavy'&&rook){P.fh=[20+21*e,r.chest+1];P.bh=[4,r.chest+6];shift('chest',7*e);shift('head',6*e);shift('hip',3*e);P.bf=[-19,-1];P.fx=e;}
     else if(f.move==='heavy'){P.ff=[12+24*e,-4-38*e];shift('chest',-4*e,2*e);shift('head',-7*e,2*e);P.bh=[-6,r.chest+4];P.fh=[8,r.chest-4];}
@@ -79,6 +84,8 @@ function pose(f,t,r){
   else if(f.state==='hurt'){shift('chest',-7,2);shift('head',-12,3);shift('hip',-2);P.fh=[-2,r.chest+12];P.bh=[-16,r.chest+2];P.ff=[14,-1];}
   // Rook's big gauntlet sits lower in neutral stances so it doesn't hide his face.
   if(f.id==='rook'&&!f.move&&f.state!=='block'&&f.state!=='blockLow'&&f.state!=='hurt')P.fh=[P.fh[0]+1,P.fh[1]+8];
+  // Brick brawls with a low guard so his huge arms don't hide his body and face.
+  if(f.id==='brick'&&!f.move&&f.state!=='hurt'&&f.state!=='block'&&f.state!=='blockLow'){P.fh=[P.fh[0]+10,P.fh[1]+9];P.bh=[P.bh[0]+6,P.bh[1]+12];}
   return{P,crouch};
 }
 // Pixel poses are authored in gameplay coordinates, not CSS images.
@@ -105,7 +112,7 @@ export function drawFighter(ctx,f,t,{scale=1,alt=false,ghost=false,alpha=null}={
   ctx.restore();
 }
 function paintFighter(ctx,f,t,alt){
-  const p={...palettes[f.id],...(alt?alts[f.id]:{})},r=RIG[f.id],rook=f.id==='rook',O=2,baseAlpha=ctx.globalAlpha;
+  const p={...palettes[f.id],...(alt?alts[f.id]:{})},r=RIG[f.id],rook=f.id==='rook',brick=f.id==='brick',O=2,baseAlpha=ctx.globalAlpha;
   ctx.save();
   const {P}=pose(f,t,r),{hip,chest,head}=P,hurt=f.state==='hurt'||f.hp<=0;
   const rect=(x,y,w,h,col)=>{ctx.fillStyle=col;ctx.fillRect(Math.round(x),Math.round(y),w,h);};
@@ -123,12 +130,18 @@ function paintFighter(ctx,f,t,alt){
     for(const[x,y,w,col,nx,ny]of pts){const o=w/2-1.5;rect(x+nx*o-1,y+ny*o-1,2,2,shade(col,.38));}
   }
   function leg(target,front){const[k,foot]=ik(hip,target,r.thigh,r.shin,knee),c=front?p.pantsLight:p.pants;
-    chain([[hip,k,rook?12:11,c],[k,foot,rook?11:10,c]]);
+    chain([[hip,k,rook?12:brick?14:11,c],[k,foot,rook?11:brick?12:10,c]]);
+    if(brick){rect(k[0]-4,k[1]-2,8,4,p.accent);rect(k[0]-2,k[1]-2,2,4,p.ink);rect(k[0]+2,k[1]-2,1,4,p.ink);
+      group([[foot[0]-7,foot[1]-7,17,7,p.boot]]);rect(foot[0]-7,foot[1]-2,17,2,p.sole);rect(foot[0]+5,foot[1]-7,5,3,shade(p.boot,.3));return;}
     if(rook){group([[k[0]-4,k[1]-4,9,7,front?p.body:p.dark]]);rect(k[0]-3,k[1]-3,7,2,p.light);rect(k[0]-1,k[1],3,2,p.accent);}
     else{rect(k[0]-2,k[1]-1,5,2,p.trim);}
     group([[foot[0]-6,foot[1]-6,15,6,p.boot]]);rect(foot[0]-6,foot[1]-2,15,2,p.sole);rect(foot[0]-5,foot[1]-6,5,2,rook?p.dark:p.body);
     rect(foot[0]+2,foot[1]-5,1,2,p.ink);rect(foot[0]+5,foot[1]-5,1,2,p.ink);if(rook)rect(foot[0]+7,foot[1]-5,2,2,p.trim);}
   function arm(shoulder,target,front){const[e,hand]=ik(shoulder,target,r.upper,r.fore,elbow),sleeve=front?p.body:p.dark;
+    if(brick){const sk=front?p.skin:p.skinDark;chain([[shoulder,e,11,sk],[e,hand,10,sk]]);
+      const wx=e[0]+(hand[0]-e[0])*.62,wy=e[1]+(hand[1]-e[1])*.62;rect(wx-4,wy-4,8,7,front?p.trim:shade(p.trim,-.3));rect(wx-4,wy-1,8,1,p.ink);
+      if(front&&P.fx>.9){ctx.globalAlpha=baseAlpha*.7;rect(hand[0]+6,hand[1]-8,4,16,p.accent);rect(hand[0]+11,hand[1]-5,3,10,p.glow);ctx.globalAlpha=baseAlpha;}
+      const g=front?p.glove:shade(p.glove,-.25);group([[hand[0]-6,hand[1]-6,12,12,g]]);rect(hand[0]-6,hand[1]-6,12,2,shade(g,.3));rect(hand[0]+2,hand[1]-4,2,8,shade(g,-.3));rect(hand[0]-3,hand[1]+1,6,1,shade(g,-.3));return;}
     if(rook){chain([[shoulder,e,11,sleeve],[e,hand,front?11:9,front?p.dark:shade(p.dark,-.2)]]);rect(e[0]-5,e[1]-2,10,3,p.trim);}
     else{chain([[shoulder,e,10,sleeve],[e,hand,8,front?p.skin:p.skinDark]]);rect(e[0]-3,e[1]-3,6,5,front?p.trim:shade(p.trim,-.3));}
     if(rook&&front){group([[hand[0]-7,hand[1]-7,15,14,p.dark]]);rect(hand[0]-7,hand[1]-7,15,3,p.light);rect(hand[0]+4,hand[1]-4,3,9,p.accent);
@@ -138,7 +151,8 @@ function paintFighter(ctx,f,t,alt){
     else{if(front&&P.fx>.9){ctx.globalAlpha=baseAlpha*.7;rect(hand[0]+5,hand[1]-7,4,14,p.trim);rect(hand[0]+10,hand[1]-4,3,8,p.glow);ctx.globalAlpha=baseAlpha;}const g=front?p.glove:shade(p.glove,-.3);group([[hand[0]-5,hand[1]-5,10,10,g]]);rect(hand[0]-5,hand[1]-5,10,2,shade(g,.4));rect(hand[0]+2,hand[1]-3,2,7,shade(g,-.3));}}
   const neck=[chest[0]-1,chest[1]-3],shF=[chest[0]+3,chest[1]+2],shB=[chest[0]-4,chest[1]+2],tw=r.torso,th=hip[1]-chest[1];
   // Back layer: Kite's striped scarf / Rook's coat tail, then the back leg and arm.
-  if(!rook){const lift=f.state==='dash'||f.y>0||f.move==='special'?-3:0,parts=[];
+  if(brick){}
+  else if(!rook){const lift=f.state==='dash'||f.y>0||f.move==='special'?-3:0,parts=[];
     for(let i=0;i<7;i++){const x=neck[0]-4-i*4.5,y=neck[1]+2+i*1.6+Math.sin(t*TAU/720+i*.9)*i*.7+lift*i*.4;parts.push([x-3,y-2,6,5,i%2?p.dark:p.trim]);}
     group(parts);for(const[x,y]of parts)rect(x,y,6,1,'#ffffff40');}
   else{group([[hip[0]-14,hip[1]-5,10,18,p.dark]]);rect(hip[0]-13,hip[1]-4,8,2,p.body);rect(hip[0]-14,hip[1]+10,10,2,p.trim);}
@@ -149,13 +163,23 @@ function paintFighter(ctx,f,t,alt){
     const pulse=.65+.35*Math.sin(t*TAU/1440);rect(chest[0],chest[1]+4,6,6,p.ink);ctx.globalAlpha=baseAlpha*pulse;rect(chest[0]+1,chest[1]+5,4,4,p.glow);ctx.globalAlpha=baseAlpha;
     rect(chest[0]-10,chest[1]-3,11,3,p.dark);
     group([[chest[0]-2,chest[1]-7,16,9,p.dark]]);rect(chest[0]-2,chest[1]-7,16,2,p.light);rect(chest[0]+1,chest[1]-3,11,2,p.trim);rect(chest[0]+11,chest[1]-6,2,2,p.accent);}
+  else if(brick){
+    // Tank top: skin at the neckline, hazard-stripe sash from shoulder to hip, chest line, big belt buckle.
+    rect(chest[0]-5,chest[1]-3,11,5,p.skin);rect(chest[0]-9,chest[1]+9,18,1,p.dark);rect(chest[0]-tw/2+2,hip[1]-7,tw-4,2,p.dark);
+    for(let i=0;i<9;i++){const q=i/8,x=chest[0]-10+q*20,y=chest[1]+1+q*(th-6);rect(x-2,y-2,5,5,i%2?p.ink:p.accent);}
+    rect(hip[0]-4,hip[1]-4,9,6,p.accent);rect(hip[0]-2,hip[1]-2,5,2,p.ink);}
   else{rect(chest[0]+2,chest[1]+1,5,th-4,p.shirt);rect(chest[0]+1,chest[1]+1,1,th-4,p.trim);rect(chest[0]+3,chest[1]+5,3,3,p.glow);rect(chest[0]+4,chest[1]+8,2,2,p.glow);
     rect(chest[0]-8,chest[1]-3,13,3,p.trim);rect(chest[0]-8,chest[1]+3,2,th-7,p.trim);rect(hip[0]-tw/2+1,hip[1]-6,tw-2,2,p.dark);}
   rect(hip[0]-tw/2,hip[1]-3,tw,4,p.ink);rect(hip[0]+2,hip[1]-2,4,2,p.trim);
   leg(P.ff,true);
+  if(brick){group([[chest[0]-2,chest[1]-7,15,9,p.dark]]);rect(chest[0]-2,chest[1]-7,15,2,shade(p.dark,.3));rect(chest[0]+1,chest[1]-3,2,2,p.accent);rect(chest[0]+8,chest[1]-3,2,2,p.accent);}
   // Head: face, hair and gear share one outline.
   const h=head;
-  if(rook){group([[h[0]-7,h[1]-8,15,17,p.skin],[h[0]-9,h[1]-11,16,6,p.hair],[h[0]-10,h[1]-7,5,11,p.hair],[h[0]-6,h[1]-2,4,6,p.dark]]);
+  if(brick){group([[h[0]-8,h[1]-7,16,15,p.skin],[h[0]-3,h[1]-16,8,10,p.hair],[h[0]-2,h[1]-20,6,5,p.hair],[h[0]-7,h[1]+3,14,7,p.beard]]);
+    rect(h[0]-2,h[1]-18,2,9,p.hairLight);rect(h[0]-6,h[1]-1,3,4,p.skinDark);rect(h[0]-2,h[1]-6,1,5,p.skinDark);rect(h[0]+1,h[1]-4,8,2,p.ink);
+    if(hurt)rect(h[0]+3,h[1]-1,4,1,p.ink);else{rect(h[0]+4,h[1]-2,3,2,'#ffffff');rect(h[0]+6,h[1]-2,1,2,p.ink);}
+    rect(h[0]+2,h[1]+5,4,1,hurt?p.trim:shade(p.beard,.4));}
+  else if(rook){group([[h[0]-7,h[1]-8,15,17,p.skin],[h[0]-9,h[1]-11,16,6,p.hair],[h[0]-10,h[1]-7,5,11,p.hair],[h[0]-6,h[1]-2,4,6,p.dark]]);
     rect(h[0]-5,h[1]-10,9,1,p.hairLight);rect(h[0]-7,h[1]+3,12,6,p.skinDark);rect(h[0]-5,h[1],2,2,p.trim);
     rect(h[0]-1,h[1]-4,12,5,p.ink);rect(h[0],h[1]-3,10,3,hurt?p.trim:p.accent);rect(h[0]+1,h[1]-3,3,1,'#ffffff');rect(h[0]+3,h[1]+5,4,1,p.ink);}
   else{group([[h[0]-7,h[1]-8,14,16,p.skin],[h[0]-8,h[1]-11,15,6,p.hair],[h[0]-12,h[1]-14,5,5,p.hair],[h[0]-6,h[1]-16,5,5,p.hair],[h[0],h[1]-14,6,4,p.hair],[h[0]-11,h[1]-7,5,12,p.hair],[h[0]+4,h[1]-10,4,4,p.hair]]);
@@ -168,6 +192,7 @@ function paintFighter(ctx,f,t,alt){
   ctx.restore();
 }
 // ---- Living stage: tuned to the rooftop background (track, billboards, wet floor). ----
+export const FX_COLOR={kite:'#ffb03a',rook:'#6dfff2',brick:'#b6ff4a'};
 const hash=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
 const SIGNS=[[566,68,15,29,'#ff5fd0'],[250,68,13,33,'#5fe4ff'],[160,114,7,29,'#ff6ad5'],[30,141,59,7,'#ffb04a']];
 function drawSigns(c,t){
@@ -184,7 +209,7 @@ function drawRain(c,t,reduced){
   c.restore();
 }
 function drawAura(c,f,t){
-  const col=f.id==='kite'?'#ffb03a':'#6dfff2';c.save();c.globalCompositeOperation='lighter';
+  const col=FX_COLOR[f.id];c.save();c.globalCompositeOperation='lighter';
   for(let i=0;i<10;i++){const ph=((t*.004+i*.37)%1),x=f.x+(hash(i+f.attackId)*2-1)*16,y=FLOOR-f.y-ph*70;c.globalAlpha=(1-ph)*.6;c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),2,5);}
   c.restore();
 }
@@ -253,7 +278,7 @@ export class Renderer{
         for(let i=0;i<12;i++){
           const y=90+i*15+Math.sin(t*.006+i)*7;
           const x=(action.face>0?25:W-25)-action.face*((t*.12+i*41)%90);
-          streak(c,x,y,25+i%4*8,action.face>0?0:Math.PI,1+(i%3),action.id==='kite'?'#ff9c61':'#72f5ef',.05+.08*strength);
+          streak(c,x,y,25+i%4*8,action.face>0?0:Math.PI,1+(i%3),FX_COLOR[action.id],.05+.08*strength);
         }
         c.restore();
       }
@@ -261,7 +286,7 @@ export class Renderer{
     // Wet-floor reflections.
     if(!menu){c.save();c.beginPath();c.rect(0,FLOOR+3,W,20);c.clip();c.translate(0,FLOOR*2+4);c.scale(1,-1);fighters.forEach((f,i)=>drawFighter(c,f,t,{alpha:.17,alt:i===1&&s.fighters[0].id===f.id}));c.restore();}
     // Super flash: the world goes dark and light bursts behind the user.
-    if(!menu&&s.freeze>0&&s.fighters[s.freezeBy]){const k=1-s.freeze/SUPER_FREEZE,u=s.fighters[s.freezeBy],col=u.id==='kite'?'#ffb03a':'#6dfff2';
+    if(!menu&&s.freeze>0&&s.fighters[s.freezeBy]){const k=1-s.freeze/SUPER_FREEZE,u=s.fighters[s.freezeBy],col=FX_COLOR[u.id];
       c.save();c.globalAlpha=.6;c.fillStyle='#04060d';c.fillRect(-W,-H,W*3,H*3);c.globalAlpha=1;c.globalCompositeOperation='lighter';
       for(let i=0;i<18;i++){const a=i*TAU/18+t*.002,rr=26+k*46;streak(c,u.x+Math.cos(a)*rr,FLOOR-u.y-40+Math.sin(a)*rr,34,a,3,col,.4*(1-k*.5));}
       impactRing(c,u.x,FLOOR-u.y-40,20+k*70,col,.6*(1-k),3);c.restore();}
@@ -312,6 +337,7 @@ export class Renderer{
           const radius=size*(.72+(i%3)*.12);
           streak(c,f.x+Math.cos(a)*radius,f.y+Math.sin(a)*radius,f.finisher?27:18,a,f.finisher?4:3,color,alpha*(.35+(i%4)*.12));
         }
+        if(f.grab){c.globalCompositeOperation='source-over';c.globalAlpha=alpha;c.textAlign='center';c.font='italic 900 16px Impact, sans-serif';c.lineWidth=4;c.strokeStyle='#07111f';c.strokeText('SLAM!',f.x,f.y-36-f.age*.5);c.fillStyle='#b6ff4a';c.fillText('SLAM!',f.x,f.y-36-f.age*.5);c.globalCompositeOperation='screen';}
         if(f.age<(f.finisher?9:5)){c.globalAlpha=alpha;c.fillStyle='#fff';c.fillRect(f.x-2,f.y-(f.finisher?29:18),4,f.finisher?58:36);c.fillRect(f.x-(f.finisher?29:18),f.y-2,f.finisher?58:36,4);}
         c.restore();}
       this.fx=this.fx.filter(f=>f.age<(['armor','ex'].includes(f.type)?24:f.type==='clash'?18:f.finisher?28:f.type==='jumpCancel'?16:f.type==='dash'?14:f.type==='land'?18:20));
@@ -358,7 +384,7 @@ export class Renderer{
   }
   superBanner(s){
     const u=s.fighters[s.freezeBy];if(!u||!s.freeze)return;const m=FIGHTERS[u.id].moves.super,k=1-s.freeze/SUPER_FREEZE,side=s.freezeBy?-1:1;
-    const slide=(1-easeOut(Math.min(1,k*3)))*W*side,fade=k>.85?1-(k-.85)/.15:1,col=u.id==='kite'?'#ff8a3d':'#3fd9d2';
+    const slide=(1-easeOut(Math.min(1,k*3)))*W*side,fade=k>.85?1-(k-.85)/.15:1,col=FX_COLOR[u.id];
     const c=this.ctx;c.save();c.globalAlpha=fade;c.translate(slide,0);
     c.fillStyle='#05070dcc';c.beginPath();c.moveTo(0,128);c.lineTo(W,112);c.lineTo(W,192);c.lineTo(0,208);c.closePath();c.fill();
     c.fillStyle=col;c.beginPath();c.moveTo(0,124);c.lineTo(W,108);c.lineTo(W,112);c.lineTo(0,128);c.closePath();c.fill();c.beginPath();c.moveTo(0,208);c.lineTo(W,192);c.lineTo(W,196);c.lineTo(0,212);c.closePath();c.fill();

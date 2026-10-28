@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-03';
-import {OpponentAI} from './shared/ai.mjs?v=20261028-03';
-import {Renderer} from './render.mjs?v=20261028-03';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-04';
+import {OpponentAI} from './shared/ai.mjs?v=20261028-04';
+import {Renderer} from './render.mjs?v=20261028-04';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261028-03';
+$('game').dataset.version='20261028-04';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
 // One-press shortcuts for the two-button meter moves.
 const COMBO={super:B.heavy|B.special,ex:B.light|B.special},COMBO_COST={super:100,ex:50};
@@ -16,7 +16,7 @@ let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,list
 // Returning players: the new default keys must not collide with bindings saved before they existed.
 for(const k of ['super','ex'])if(Object.entries(bindings).some(([n,c])=>n!==k&&c===bindings[k]))bindings[k]='';
 const DUMMY_MODES=['STAND','BLOCK','CROUCH BLOCK','JUMP'];let training=false,dummyMode=0,showBoxes=false;
-let mode='menu',state=createMatch([selected,'rook']),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
+let mode='menu',state=createMatch([selected,menuRival()]),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
 // Static hosts (neonrumble.top, GitHub Pages, Google Sites embeds) can't run the room server, so they use the hosted one.
 // The Node server serves the page itself, so pages it serves (localhost, the server's own domain) talk to their own origin.
 const HOSTED_SERVER='https://play.neonrumble.top';
@@ -44,7 +44,7 @@ document.addEventListener('keydown',e=>{
   if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=(B[k]??(canAfford(k)?COMBO[k]:0));if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
 });
 document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
-function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=id==='kite'?'01 / 02':'02 / 02';}
+function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=`${String(Object.keys(FIGHTERS).indexOf(id)+1).padStart(2,'0')} / ${String(Object.keys(FIGHTERS).length).padStart(2,'0')}`;}
 document.querySelectorAll('[data-fighter]').forEach(b=>b.onclick=()=>choose(b.dataset.fighter));choose(selected);
 function endpoint(){const u=new URL(serverBase||location.origin);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.pathname='/ws';u.search='';return u.href;}
 async function pingServer(timeout=6000){try{const r=await fetch((serverBase||'')+'/health',{signal:AbortSignal.timeout(timeout),cache:'no-store'});const data=await r.json();return data.game==='neon-rumble'&&!!data.ok;}catch{return false;}}
@@ -99,14 +99,18 @@ function updateHUD(){const s=confirmed;const key=`${s.matchId}|${s.phase}|${Math
 async function roomAction(type,code){clearInput();sound.unlock();notice('Connecting to the room server…');$('create').disabled=true;try{if(!await wakeServer())throw new Error('The online server is not responding. Try again in a minute.');notice('Connecting to the room server…');await connect();send({type,fighter:selected,...(code?{code}:{})});}catch(e){notice(e.message);$('serverDialog').showModal();$('serverUrl').value=serverBase;}finally{$('create').disabled=false;}}
 $('create').onclick=()=>roomAction('create');$('joinForm').onsubmit=e=>{e.preventDefault();roomAction('join',$('roomInput').value.trim().toUpperCase());};$('ready').onclick=()=>send({type:'ready'});
 $('copyInvite').onclick=async()=>{const u=new URL(location.href);u.hash='';u.search='';u.searchParams.set('room',room.code);if(serverBase&&serverBase!==HOSTED_SERVER)u.searchParams.set('server',serverBase);try{await navigator.clipboard.writeText(u.href);$('copyInvite').textContent='COPIED — SEND IT TO YOUR RIVAL';}catch{notice('Invite link: '+u.href);}};
-function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,selected==='kite'?'rook':'kite'],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();if(training)notice(`Training: your meter stays full. Press ${label(bindings.super)} for your SUPER, ${label(bindings.ex)} for an EX special, and try Down/Forward + ${label(bindings.special)}.`);$('game').focus();}
+// Practice faces a random different fighter (the training dummy too); the menu backdrop shows the next rival.
+function others(){return Object.keys(FIGHTERS).filter(id=>id!==selected);}
+function practiceRival(){const o=others();return o[Math.floor(Math.random()*o.length)];}
+function menuRival(){return others()[0];}
+function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,practiceRival()],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();if(training)notice(`Training: your meter stays full. Press ${label(bindings.super)} for your SUPER, ${label(bindings.ex)} for an EX special, and try Down/Forward + ${label(bindings.special)}.`);$('game').focus();}
 $('practice').onclick=()=>startAI(false);$('training').onclick=()=>startAI(true);$('tryUpdate').onclick=()=>startAI(true);
 // Training dummy: stands still by default; can guard (high or low) or hop so you can test overheads and anti-airs.
 function dummyMask(s){const d=s.fighters[1],p=s.fighters[0],away=d.x>=p.x?B.right:B.left;return[0,away,away|B.crouch,s.tick%50===0?B.jump:0][dummyMode];}
 $('dummyMode').onclick=()=>{dummyMode=(dummyMode+1)%DUMMY_MODES.length;$('dummyMode').textContent='DUMMY: '+DUMMY_MODES[dummyMode];$('game').focus();};
 $('boxes').onclick=()=>{showBoxes=!showBoxes;$('boxes').textContent='HITBOXES: '+(showBoxes?'ON':'OFF');$('game').focus();};
 $('resetTraining').onclick=()=>{startAI(true);};
-function leave(){training=false;show('trainingTools',false);send({type:'leave'});session(null);room=null;reconnecting=false;networkPause=false;connectionGeneration++;socket?.close();socket=null;mode='menu';state=createMatch([selected,'rook']);confirmed=state;pending=[];clearInput();notice('');show('result',false);setScreen();checkServer();}
+function leave(){training=false;show('trainingTools',false);send({type:'leave'});session(null);room=null;reconnecting=false;networkPause=false;connectionGeneration++;socket?.close();socket=null;mode='menu';state=createMatch([selected,menuRival()]);confirmed=state;pending=[];clearInput();notice('');show('result',false);setScreen();checkServer();}
 for(const id of ['leaveLobby','leaveResult','leaveMatch'])$(id).onclick=leave;
 $('rematch').onclick=()=>{if(mode==='ai')startAI(training);else{send({type:'rematch'});$('rematchStatus').textContent='Waiting for your rival…';}};
 $('sound').onclick=()=>{sound.unlock();sound.enabled=!sound.enabled;$('sound').textContent=sound.enabled?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-label',sound.enabled?'Turn sound off':'Turn sound on');};
