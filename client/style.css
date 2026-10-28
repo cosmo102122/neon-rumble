@@ -68,3 +68,6 @@ html.embedded .screen{border-top:1px solid #26354a}
 .pad-btns{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-items:center}
 
 .fighter-select{flex-wrap:wrap}.fighter{min-width:0}.fighter strong{font-size:14px}
+
+.training-stats{font:bold 10px 'Courier New',monospace;color:#ffe08a;align-self:center;margin-right:4px;letter-spacing:1px}#recordDummy.recording{background:#7a1430;border-color:#ff5f87;animation:none}
+@media(max-width:700px){.training-stats{font-size:7px}}

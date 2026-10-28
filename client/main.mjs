@@ -1,9 +1,9 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-04';
-import {OpponentAI} from './shared/ai.mjs?v=20261028-04';
-import {Renderer} from './render.mjs?v=20261028-04';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-05';
+import {OpponentAI} from './shared/ai.mjs?v=20261028-05';
+import {Renderer} from './render.mjs?v=20261028-05';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261028-04';
+$('game').dataset.version='20261028-05';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
 // One-press shortcuts for the two-button meter moves.
 const COMBO={super:B.heavy|B.special,ex:B.light|B.special},COMBO_COST={super:100,ex:50};
@@ -15,7 +15,9 @@ function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));}ca
 let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,listening=null,selected=stored('nr-fighter','kite');if(!FIGHTERS[selected])selected='kite';
 // Returning players: the new default keys must not collide with bindings saved before they existed.
 for(const k of ['super','ex'])if(Object.entries(bindings).some(([n,c])=>n!==k&&c===bindings[k]))bindings[k]='';
-const DUMMY_MODES=['STAND','BLOCK','CROUCH BLOCK','JUMP'];let training=false,dummyMode=0,showBoxes=false;
+const DUMMY_MODES=['STAND','BLOCK','CROUCH BLOCK','JUMP','REPLAY'];let training=false,dummyMode=0,showBoxes=false;
+// Training record/replay (inputs stored relative to the dummy's facing) and combo stats.
+const REC_MAX=600;let recording=false,recorded=[],replayAt=0,comboDmg=0,comboHits=0,bestDmg=0;
 let mode='menu',state=createMatch([selected,menuRival()]),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
 // Static hosts (neonrumble.top, GitHub Pages, Google Sites embeds) can't run the room server, so they use the hosted one.
 // The Node server serves the page itself, so pages it serves (localhost, the server's own domain) talk to their own origin.
@@ -41,6 +43,7 @@ document.addEventListener('keydown',e=>{
     const other=Object.keys(bindings).find(k=>bindings[k]===e.code);if(other)bindings[other]=bindings[listening];bindings[listening]=e.code;listening=null;save('nr-keys',bindings);renderBindings();renderControls();notice('');return;}
   if(e.target.matches('input,select,textarea')||document.querySelector('dialog[open]'))return;
   if(training&&mode==='ai'&&e.code==='KeyR'&&!Object.values(bindings).includes('KeyR')){e.preventDefault();startAI(true);return;}
+  if(training&&mode==='ai'&&e.code==='KeyT'&&!e.repeat&&!Object.values(bindings).includes('KeyT')){e.preventDefault();toggleRecord();return;}
   if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=(B[k]??(canAfford(k)?COMBO[k]:0));if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
 });
 document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
@@ -106,11 +109,23 @@ function menuRival(){return others()[0];}
 function startAI(isTraining=false){training=isTraining===true;clearInput();if(room)leave();mode='ai';myIndex=0;state=createMatch([selected,practiceRival()],{matchId:Date.now(),training,introFrames:training?30:120});confirmed=state;ai=training?null:new OpponentAI($('difficulty').value);show('trainingTools',training);renderer.lastEvent=0;networkPause=false;lastHud='';$('rematchStatus').textContent='';notice('');sound.unlock();setScreen();updateHUD();if(training)notice(`Training: your meter stays full. Press ${label(bindings.super)} for your SUPER, ${label(bindings.ex)} for an EX special, and try Down/Forward + ${label(bindings.special)}.`);$('game').focus();}
 $('practice').onclick=()=>startAI(false);$('training').onclick=()=>startAI(true);$('tryUpdate').onclick=()=>startAI(true);
 // Training dummy: stands still by default; can guard (high or low) or hop so you can test overheads and anti-airs.
-function dummyMask(s){const d=s.fighters[1],p=s.fighters[0],away=d.x>=p.x?B.right:B.left;return[0,away,away|B.crouch,s.tick%50===0?B.jump:0][dummyMode];}
-$('dummyMode').onclick=()=>{dummyMode=(dummyMode+1)%DUMMY_MODES.length;$('dummyMode').textContent='DUMMY: '+DUMMY_MODES[dummyMode];$('game').focus();};
+function orient(m,face){if(face>0)return m;const l=m&B.left,r=m&B.right;return(m&~(B.left|B.right))|(l?B.right:0)|(r?B.left:0);}
+function dummyMask(s){const d=s.fighters[1],p=s.fighters[0],away=d.x>=p.x?B.right:B.left;
+  if(DUMMY_MODES[dummyMode]==='REPLAY'){if(!recorded.length)return 0;const m=orient(recorded[replayAt],d.face);replayAt=(replayAt+1)%recorded.length;return m;}
+  return[0,away,away|B.crouch,s.tick%50===0?B.jump:0][dummyMode];}
+function setDummyMode(i){dummyMode=i;replayAt=0;$('dummyMode').textContent='DUMMY: '+DUMMY_MODES[dummyMode]+(DUMMY_MODES[dummyMode]==='REPLAY'&&!recorded.length?' (RECORD FIRST)':'');}
+function toggleRecord(){
+  if(!recording){recording=true;recorded=[];$('recordDummy').textContent='STOP (T)';$('recordDummy').classList.add('recording');notice('Recording: you now control the dummy for up to 10 seconds. Press T (or STOP) when done.');}
+  else{recording=false;$('recordDummy').textContent='RECORD (T)';$('recordDummy').classList.remove('recording');
+    if(recorded.length){setDummyMode(DUMMY_MODES.indexOf('REPLAY'));notice(`The dummy will loop your ${(recorded.length/60).toFixed(1)}s recording. Switch with the DUMMY button.`);}else notice('');}
+  $('game').focus();}
+function trackStats(e){if(!training||e.type!=='hit'||e.by!==0)return;if(e.combo===1)comboDmg=0;comboDmg+=e.damage;comboHits=e.combo;bestDmg=Math.max(bestDmg,comboDmg);
+  $('trainingStats').textContent=`COMBO ${comboHits} HIT${comboHits>1?'S':''} · ${comboDmg} DMG · BEST ${bestDmg}`;}
+$('recordDummy').onclick=toggleRecord;
+$('dummyMode').onclick=()=>{setDummyMode((dummyMode+1)%DUMMY_MODES.length);$('game').focus();};
 $('boxes').onclick=()=>{showBoxes=!showBoxes;$('boxes').textContent='HITBOXES: '+(showBoxes?'ON':'OFF');$('game').focus();};
 $('resetTraining').onclick=()=>{startAI(true);};
-function leave(){training=false;show('trainingTools',false);send({type:'leave'});session(null);room=null;reconnecting=false;networkPause=false;connectionGeneration++;socket?.close();socket=null;mode='menu';state=createMatch([selected,menuRival()]);confirmed=state;pending=[];clearInput();notice('');show('result',false);setScreen();checkServer();}
+function leave(){training=false;if(recording)toggleRecord();show('trainingTools',false);send({type:'leave'});session(null);room=null;reconnecting=false;networkPause=false;connectionGeneration++;socket?.close();socket=null;mode='menu';state=createMatch([selected,menuRival()]);confirmed=state;pending=[];clearInput();notice('');show('result',false);setScreen();checkServer();}
 for(const id of ['leaveLobby','leaveResult','leaveMatch'])$(id).onclick=leave;
 $('rematch').onclick=()=>{if(mode==='ai')startAI(training);else{send({type:'rematch'});$('rematchStatus').textContent='Waiting for your rival…';}};
 $('sound').onclick=()=>{sound.unlock();sound.enabled=!sound.enabled;$('sound').textContent=sound.enabled?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-label',sound.enabled?'Turn sound off':'Turn sound on');};
@@ -146,7 +161,7 @@ let prevPos=null,prevProj=null;
 function rememberPositions(){prevPos=state.fighters.map(f=>({x:f.x,y:f.y}));prevProj=new Map(state.projectiles.map(p=>[p.id,p.x]));}
 function advance(){
   rememberPositions();
-  if(mode==='ai'&&!document.querySelector('dialog[open]')&&!document.hidden){step(state,[mask(),training?dummyMask(state):ai.input(state)]);confirmed=state;renderer.events(state,e=>sound.event(e));updateHUD();}
+  if(mode==='ai'&&!document.querySelector('dialog[open]')&&!document.hidden){const m=mask();if(training&&recording){recorded.push(orient(m,state.fighters[1].face));step(state,[0,m]);if(recorded.length>=REC_MAX)toggleRecord();}else step(state,[m,training?dummyMask(state):ai.input(state)]);confirmed=state;renderer.events(state,e=>{sound.event(e);trackStats(e);});updateHUD();}
   else if(mode==='online'&&room&&socket?.readyState===1&&!networkPause&&!reconnecting){const m=document.hidden?0:mask();send({type:'input',seq:++seq,mask:m});pending.push({seq,mask:m});if(pending.length>120)pending.shift();if(performance.now()-lastSnapshot<300){const inputs=[...lastServerInputs];inputs[myIndex]=m;step(state,inputs);}}
 }
 // The 60 Hz simulation is stepped from the display loop (fixed timestep), so every screen refresh sees an
