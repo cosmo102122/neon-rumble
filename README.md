@@ -77,6 +77,8 @@ Official deployment references: https://render.com/docs/deploy-node-express-app 
 
 Click **Edit Keys** to change bindings. Changes stay on that browser. Hold down-back to block lows; use standing guard against jumping attacks. Jumping over your rival flips which direction counts as "away". Only EX specials and supers do chip damage. Air attacks are overheads. Crouch + light performs a low.
 
+**Controllers and touch.** Any standard controller works: stick or D-pad to move, A jump, X light, Y heavy, B special, RB dash, LB block, RT super, LT EX, Start to begin or rematch. Phones and tablets get on-screen buttons during a fight (hold the direction away from your rival to block); EX and Super buttons dim until you have the meter.
+
 **Meter.** The bar under your health fills when you hit, get hit or block, and carries over between rounds. Half a bar buys an EX special (Light + Special); a full bar buys a super (Heavy + Special), which freezes the action for a cut-in. Pressing the buttons within two frames counts as together. Specials cancel into supers on hit.
 
 **Command moves.** Kite: Down + Special is a rising uppercut that cannot be hit by air attacks (punishable if blocked); Forward + Special is a low slide. Super: *Skyline Breaker*, an invulnerable rush. Rook: Down + Special sends a quake wave along the floor that must be blocked crouching; Forward + Special is a shoulder charge that absorbs one hit. Super: *Overload Cannon*, a beam that eats normal projectiles.
