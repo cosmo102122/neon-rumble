@@ -1,6 +1,8 @@
 // Pure deterministic simulation. Both the server and prediction client use this file.
 export const FPS = 60, W = 640, H = 360, FLOOR = 290, ROUND_FRAMES = 60 * 60;
 export const B = { left:1, right:2, jump:4, crouch:8, light:16, heavy:32, special:64, dash:128, block:256 };
+// Arenas are purely visual, but live in match state so both online players see the same one.
+export const STAGES = ['rooftop','subway'];
 export const METER_MAX = 100, EX_COST = 50, SUPER_FREEZE = 40;
 // Move fields beyond frame data:
 //   cd: special cooldown it starts · invuln: 'all' | 'air' | 'proj' during startup+active · armor: absorbs one hit
@@ -73,7 +75,7 @@ export function makeFighter(id, index) {
 }
 export function createMatch(ids=['kite','kite'], options={}) {
   // training: no clock, no KOs, health refills once a combo ends and both meters stay full.
-  return {tick:0,phase:'intro',phaseFrames:options.introFrames??120,round:1,wins:[0,0],fighters:ids.map(makeFighter),training:!!options.training,
+  return {tick:0,phase:'intro',phaseFrames:options.introFrames??120,round:1,wins:[0,0],fighters:ids.map(makeFighter),training:!!options.training,stage:STAGES.includes(options.stage)?options.stage:'rooftop',
     timer:ROUND_FRAMES,hitstop:0,freeze:0,freezeBy:-1,projectiles:[],events:[],eventId:0,winner:-1,roundWinner:-1,roundReason:'',matchId:options.matchId??1};
 }
 function emit(s,type,data={}) {s.events.push({id:++s.eventId,tick:s.tick,type,...data});if(s.events.length>36)s.events.shift();}

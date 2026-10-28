@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-05';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-06';
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);
 const easeInOut=v=>{v=clamp01(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
@@ -192,6 +192,51 @@ function paintFighter(ctx,f,t,alt){
   ctx.restore();
 }
 // ---- Living stage: tuned to the rooftop background (track, billboards, wet floor). ----
+// ---- Nightline Subway: painted once into a back layer (ceiling, wall, track) and a front layer (pillars, platform). ----
+export const STAGE_NAMES={rooftop:'NIGHTLINE ROOFTOP',subway:'NIGHTLINE SUBWAY'};
+function paintSubwayBack(g){
+  g.fillStyle='#0a0e18';g.fillRect(0,0,W,36);
+  for(const x of [40,200,360,520]){g.fillStyle='#1c2738';g.fillRect(x-4,18,88,10);g.fillStyle='#e6f3ff';g.fillRect(x,21,80,4);}
+  // Tiled wall.
+  g.fillStyle='#1b3247';g.fillRect(0,36,W,162);
+  for(let y=36;y<198;y+=10)for(let x=(y/10%2)*10;x<W;x+=20){g.fillStyle='#21405a';g.fillRect(x+1,y+1,18,8);g.fillStyle='#2a4d6b';g.fillRect(x+1,y+1,18,1);}
+  g.fillStyle='#ff3d8b';g.fillRect(0,118,W,7);g.fillStyle='#ffa3c9';g.fillRect(0,118,W,1);g.fillStyle='#41e3ff';g.fillRect(0,128,W,2);
+  // Posters.
+  const posters=[[54,48,'NEON','RUMBLE','#ff7a2f','#2a0f3d'],[268,48,'LINE','7','#41e3ff','#0d2236'],[470,48,'FIGHT','CLUB','#b6ff4a','#1a2a10']];
+  for(const [x,y,a,b,fg,bg] of posters){g.fillStyle='#05080f';g.fillRect(x-3,y-3,102,64);g.fillStyle=bg;g.fillRect(x,y,96,58);
+    g.fillStyle=fg;g.fillRect(x+6,y+6,84,3);g.fillRect(x+6,y+49,84,3);g.textAlign='center';g.font='italic 900 17px Impact, sans-serif';g.fillText(a,x+48,y+29);g.fillStyle='#ffffff';g.fillText(b,x+48,y+46);}
+  // Station sign.
+  g.fillStyle='#05080f';g.fillRect(206,138,228,26);g.fillStyle='#16357a';g.fillRect(208,140,224,22);g.fillStyle='#ffffff';g.font='bold 11px monospace';g.textAlign='center';g.fillText('NIGHTLINE · PLATFORM 3',320,155);
+  // Track pit with rails.
+  g.fillStyle='#06080e';g.fillRect(0,198,W,44);g.fillStyle='#2a2f3a';g.fillRect(0,228,W,3);g.fillRect(0,236,W,3);g.fillStyle='#c9a227';g.fillRect(0,222,W,2);
+  for(let x=0;x<W;x+=18){g.fillStyle='#15181f';g.fillRect(x,231,10,5);}
+}
+function paintSubwayFront(g){
+  // Pillars stand on the platform, in front of passing trains.
+  for(const x of [6,608]){g.fillStyle='#05080f';g.fillRect(x-2,36,30,206);g.fillStyle='#2a3e55';g.fillRect(x,36,26,206);g.fillStyle='#3f5a78';g.fillRect(x,36,4,206);g.fillStyle='#ff3d8b';g.fillRect(x,118,26,7);
+    g.fillStyle='#16357a';g.fillRect(x+3,150,20,14);g.fillStyle='#fff';g.font='bold 9px monospace';g.textAlign='center';g.fillText('3',x+13,161);}
+  // Platform edge: yellow safety strip with tactile bumps, then the tiled floor.
+  g.fillStyle='#05080f';g.fillRect(0,240,W,2);g.fillStyle='#ffcc33';g.fillRect(0,242,W,8);
+  for(let x=2;x<W;x+=6){g.fillStyle='#b88f17';g.fillRect(x,244,2,2);g.fillRect(x+3,247,2,2);}
+  g.fillStyle='#34465a';g.fillRect(0,250,W,110);
+  const rows=[250,262,277,296,320,350,360];
+  for(let i=0;i<rows.length-1;i++){const y=rows[i],h=rows[i+1]-y,tw=24+i*10;g.fillStyle='#2a3a4c';g.fillRect(0,y,W,1);for(let x=(i%2)*tw/2;x<W;x+=tw)g.fillRect(Math.round(x),y,1,h);}
+  // Polished floor: soft reflections of the ceiling tubes.
+  for(const x of [40,200,360,520])for(let i=0;i<6;i++){g.globalAlpha=.07*(1-i/6);g.fillStyle='#e6f3ff';g.fillRect(x+28,252+i*18,24,18);}g.globalAlpha=1;
+}
+function drawSubwayLife(c,t){
+  // A train blasts through every 13 s; its headlight glow sweeps the wall just before it arrives.
+  const period=13000,ph=t%period,run=1300,lead=500;
+  if(ph<lead){c.save();c.globalCompositeOperation='lighter';c.globalAlpha=ph/lead*.25;c.fillStyle='#fff3c4';c.fillRect(W-200*(ph/lead),150,200*(ph/lead),88);c.restore();}
+  else if(ph<lead+run){const k=(ph-lead)/run,len=1000,x0=Math.round(W+20-k*(W+len+40));c.save();c.beginPath();c.rect(0,140,W,100);c.clip();
+    for(let car=0;car<5;car++){const x=x0+car*200;if(x>W||x+196<0)continue;
+      c.fillStyle='#05080f';c.fillRect(x-1,153,198,82);c.fillStyle='#c9d3df';c.fillRect(x,154,196,78);c.fillStyle='#e8eef5';c.fillRect(x,154,196,4);
+      c.fillStyle='#ffe7a8';c.fillRect(x+8,166,180,26);for(let w=0;w<9;w++){c.fillStyle='#4b4f5a';c.fillRect(x+8+w*20,166,2,26);}
+      c.fillStyle='#ff3d8b';c.fillRect(x,198,196,6);c.fillStyle='#8a96a6';c.fillRect(x+90,206,16,26);}
+    c.globalAlpha=.35;c.fillStyle='#ffffff';for(let i=0;i<10;i++)c.fillRect(0,158+i*8,W,1);c.restore();}
+  // One tube flickers now and then.
+  if(hash(Math.floor(t/90))<.05){c.fillStyle='#0a0e18';c.fillRect(360,21,80,4);}
+}
 export const FX_COLOR={kite:'#ffb03a',rook:'#6dfff2',brick:'#b6ff4a'};
 const hash=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
 const SIGNS=[[566,68,15,29,'#ff5fd0'],[250,68,13,33,'#5fe4ff'],[160,114,7,29,'#ff6ad5'],[30,141,59,7,'#ffb04a']];
@@ -261,10 +306,10 @@ export class Renderer{
     let sx=0,sy=0;
     if(this.shake>0&&!this.reduced){sx=Math.round(Math.sin(t*.19)*this.shake);sy=Math.round(Math.cos(t*.23)*this.shake*.45);this.shake*=.76;if(this.shake<.18)this.shake=0;}
     c.translate(W/2+sx,H/2+sy);c.scale(zoom,zoom);c.translate(-focusX,-focusY);
-    c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);const stage=this.stageLayer();
+    c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);const stageId=menu?'rooftop':s.stage??'rooftop',stage=this.stageLayer(stageId);
     // Smooth only the backdrop: it is a downscaled painting, and nearest-neighbour makes it shimmer as the camera moves.
     if(stage){c.imageSmoothingEnabled=true;c.drawImage(stage,0,0);c.imageSmoothingEnabled=false;}
-    drawSigns(c,t);
+    if(stageId==='subway'){drawSubwayLife(c,t);c.drawImage(this.subway.front,0,0);}else drawSigns(c,t);
     // Low-key city animation and drifting rooftop dust.
     c.globalAlpha=.3;for(let i=0;i<13;i++){const x=(i*63+t*.007)%W,y=170+(i*23)%120;c.fillStyle=i%2?'#a4c8e0':'#ffbb75';c.fillRect(Math.floor(x),Math.floor(y+Math.sin(t/800+i)*3),1,1);}c.globalAlpha=1;
     const fighters=live;
@@ -348,7 +393,7 @@ export class Renderer{
         if(f.combo>=5){const y=139;c.globalAlpha=.65;c.fillStyle=i?'#52deda':'#ff8a4b';c.fillRect(i?x-72:x,y,72,2);}
         c.restore();
       }});
-      if(!paused&&s.phase==='intro'){this.title(s.phaseFrames>30?`ROUND ${s.round}`:'FIGHT',s.phaseFrames>30?'FIRST TO TWO':'',s.phaseFrames<=30);}
+      if(!paused&&s.phase==='intro'){this.title(s.phaseFrames>30?`ROUND ${s.round}`:'FIGHT',s.phaseFrames>30?(s.subtitle??'FIRST TO TWO'):'',s.phaseFrames<=30);}
       if(s.phase==='fight'&&s.events.some(e=>e.type==='fight'&&s.tick-e.tick<24))this.title('FIGHT','',true);
       if(s.phase==='roundOver'){
         if(s.phaseFrames>118){
@@ -363,13 +408,17 @@ export class Renderer{
         c.drawImage(this.vignetteLayer(),0,0);
       }
     }
-    drawRain(c,t,this.reduced);
+    if(stageId==='rooftop')drawRain(c,t,this.reduced);
     if(this.koFlash>0&&!this.reduced){c.save();c.globalAlpha=this.koFlash*.5;c.fillStyle='#ffffff';c.fillRect(-W,-H,W*3,H*3);c.restore();this.koFlash*=.85;if(this.koFlash<.02)this.koFlash=0;}
     if(this.flash>0&&!this.reduced){c.restore();c.save();c.globalAlpha=this.flash*.28;c.fillStyle='#fff4dc';c.fillRect(0,0,W,H);this.flash*=.56;this.cameraPunch*=.5;if(this.cameraPunch<.002)this.cameraPunch=0;}
     c.restore();
     if(!menu&&s.freeze>0)this.superBanner(s);
   }
-  stageLayer(){
+  stageLayer(id='rooftop'){
+    if(id==='subway'){
+      if(!this.subway){const back=makeCanvas(W,H),front=makeCanvas(W,H);if(!back)return null;paintSubwayBack(back.getContext('2d'));paintSubwayFront(front.getContext('2d'));this.subway={back,front};}
+      return this.subway.back;
+    }
     if(this.stageCanvas)return this.stageCanvas;
     if(!(this.stage.complete&&this.stage.naturalWidth))return null;
     const cv=makeCanvas(W,H),g=cv.getContext('2d');g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';

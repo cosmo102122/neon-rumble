@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {WebSocketServer,WebSocket} from 'ws';
-import {createMatch,step,FIGHTERS} from './shared/engine.mjs';
+import {createMatch,step,FIGHTERS,STAGES} from './shared/engine.mjs';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const TYPES={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.json':'application/json','.webp':'image/webp'};
@@ -32,7 +32,7 @@ export function createGameServer({reconnectMs=15000,roomTtlMs=30*60*1000,autoTic
   function roomMessage(r){return{type:'room',code:r.code,players:r.players.map(p=>p?{fighter:p.fighter,ready:p.ready,connected:!!p.ws}:null),rematch:r.players.map(p=>!!p?.rematch)};}
   function broadcast(r,data){r.players.forEach(p=>send(p?.ws,data));}
   function snapshot(r){if(r.game)broadcast(r,{type:'state',state:r.game,ack:r.players.map(p=>p?.ack??-1),inputs:r.players.map(p=>p?.mask??0),paused:r.paused,graceMs:r.paused?Math.max(0,r.pauseUntil-Date.now()):0});}
-  function start(r){r.game=createMatch(r.players.map(p=>p.fighter),{matchId:(r.game?.matchId??0)+1});r.paused=false;r.players.forEach(p=>{p.ready=false;p.rematch=false;p.mask=0;p.edges=0;});broadcast(r,roomMessage(r));snapshot(r);}
+  function start(r){const matchId=(r.game?.matchId??0)+1;r.game=createMatch(r.players.map(p=>p.fighter),{matchId,stage:STAGES[(matchId-1)%STAGES.length]});r.paused=false;r.players.forEach(p=>{p.ready=false;p.rematch=false;p.mask=0;p.edges=0;});broadcast(r,roomMessage(r));snapshot(r);}
   function attach(ws,r,index,p){p.ws=ws;p.disconnectedAt=0;ws.room=r;ws.index=index;send(ws,{type:'joined',code:r.code,index,token:p.token});broadcast(r,roomMessage(r));if(r.game){if(r.players.every(p=>p?.ws)){r.paused=false;broadcast(r,{type:'notice',message:'Both players connected. Fight resumes.'});}snapshot(r);}}
   function detach(ws,explicit=false){const r=ws.room;if(!r)return;const p=r.players[ws.index];ws.room=null;if(!p||p.ws!==ws)return;p.ws=null;p.mask=0;p.edges=0;p.ready=false;p.rematch=false;p.disconnectedAt=Date.now();
     if(r.game&&!['matchOver','forfeit'].includes(r.game.phase)){
