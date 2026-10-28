@@ -1,4 +1,4 @@
-import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-06';
+import {FLOOR,W,H,FIGHTERS,hurtbox,hitbox,projectileBox,SUPER_FREEZE} from './shared/engine.mjs?v=20261028-07';
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const easeOut=v=>1-Math.pow(1-clamp01(v),3);
 const easeInOut=v=>{v=clamp01(v);return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
@@ -192,50 +192,126 @@ function paintFighter(ctx,f,t,alt){
   ctx.restore();
 }
 // ---- Living stage: tuned to the rooftop background (track, billboards, wet floor). ----
-// ---- Nightline Subway: painted once into a back layer (ceiling, wall, track) and a front layer (pillars, platform). ----
+// ---- Nightline Subway: detailed pixel art painted once into a back layer (ceiling, wall, track) and a front layer
+// (pillars, props, platform). Animated life is drawn around those layers each frame. ----
 export const STAGE_NAMES={rooftop:'NIGHTLINE ROOFTOP',subway:'NIGHTLINE SUBWAY'};
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+const rnd=i=>{const x=Math.sin(i*91.17+7.3)*43758.5453;return x-Math.floor(x);};
+// Ordered (Bayer) dithering: the classic pixel-art way to shade without blending.
+function dither(g,x0,y0,w,h,col,density){g.fillStyle=col;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const d=density(x/w,y/h,x0+x,y0+y);if(d*16>BAYER[((y0+y)&3)*4+((x0+x)&3)]+.5)g.fillRect(x0+x,y0+y,1,1);}}
+const TUBES=[56,216,376,536];
 function paintSubwayBack(g){
-  g.fillStyle='#0a0e18';g.fillRect(0,0,W,36);
-  for(const x of [40,200,360,520]){g.fillStyle='#1c2738';g.fillRect(x-4,18,88,10);g.fillStyle='#e6f3ff';g.fillRect(x,21,80,4);}
-  // Tiled wall.
-  g.fillStyle='#1b3247';g.fillRect(0,36,W,162);
-  for(let y=36;y<198;y+=10)for(let x=(y/10%2)*10;x<W;x+=20){g.fillStyle='#21405a';g.fillRect(x+1,y+1,18,8);g.fillStyle='#2a4d6b';g.fillRect(x+1,y+1,18,1);}
-  g.fillStyle='#ff3d8b';g.fillRect(0,118,W,7);g.fillStyle='#ffa3c9';g.fillRect(0,118,W,1);g.fillStyle='#41e3ff';g.fillRect(0,128,W,2);
-  // Posters.
-  const posters=[[54,48,'NEON','RUMBLE','#ff7a2f','#2a0f3d'],[268,48,'LINE','7','#41e3ff','#0d2236'],[470,48,'FIGHT','CLUB','#b6ff4a','#1a2a10']];
-  for(const [x,y,a,b,fg,bg] of posters){g.fillStyle='#05080f';g.fillRect(x-3,y-3,102,64);g.fillStyle=bg;g.fillRect(x,y,96,58);
-    g.fillStyle=fg;g.fillRect(x+6,y+6,84,3);g.fillRect(x+6,y+49,84,3);g.textAlign='center';g.font='italic 900 17px Impact, sans-serif';g.fillText(a,x+48,y+29);g.fillStyle='#ffffff';g.fillText(b,x+48,y+46);}
-  // Station sign.
-  g.fillStyle='#05080f';g.fillRect(206,138,228,26);g.fillStyle='#16357a';g.fillRect(208,140,224,22);g.fillStyle='#ffffff';g.font='bold 11px monospace';g.textAlign='center';g.fillText('NIGHTLINE · PLATFORM 3',320,155);
-  // Track pit with rails.
-  g.fillStyle='#06080e';g.fillRect(0,198,W,44);g.fillStyle='#2a2f3a';g.fillRect(0,228,W,3);g.fillRect(0,236,W,3);g.fillStyle='#c9a227';g.fillRect(0,222,W,2);
-  for(let x=0;x<W;x+=18){g.fillStyle='#15181f';g.fillRect(x,231,10,5);}
+  // Ceiling: concrete, a long duct with bolts, sagging cables, tube-light fixtures.
+  g.fillStyle='#080c16';g.fillRect(0,0,W,42);for(let x=0;x<W;x+=80){g.fillStyle='#0d1322';g.fillRect(x,0,1,42);}
+  g.fillStyle='#05080f';g.fillRect(0,7,W,11);g.fillStyle='#1a2232';g.fillRect(0,8,W,9);g.fillStyle='#2c3850';g.fillRect(0,8,W,2);
+  for(let x=12;x<W;x+=40){g.fillStyle='#3d4a63';g.fillRect(x,12,2,2);}
+  for(const [base,sag,col] of [[20,7,'#0b0f19'],[23,10,'#141a28'],[19,5,'#1d1220']])for(let x=0;x<W;x++){const t=(x%120)/120;g.fillStyle=col;g.fillRect(x,Math.round(base+sag*Math.sin(Math.PI*t)),1,2);}
+  for(const x of TUBES){g.fillStyle='#05080f';g.fillRect(x-2,26,76,10);g.fillStyle='#1c2738';g.fillRect(x-1,27,74,8);g.fillStyle='#e6f3ff';g.fillRect(x+3,30,66,3);g.fillStyle='#ffffff';g.fillRect(x+3,30,66,1);}
+  // Tiled wall with per-tile colour variation, highlights and grout.
+  g.fillStyle='#0f1e2b';g.fillRect(0,42,W,158);
+  const tones=['#1b364a','#1e3b51','#21405a','#193247','#234560'];
+  for(let row=0;row*9+42<200;row++){const y=42+row*9;for(let x=(row%2)*8-16;x<W;x+=16){const c=tones[Math.floor(rnd(row*97+x)*tones.length)];g.fillStyle=c;g.fillRect(x+1,y+1,15,8);g.fillStyle=shade(c,.18);g.fillRect(x+1,y+1,15,1);}}
+  // Water streaks under the duct and grime collecting toward the floor.
+  for(const sx of [88,252,430,590]){dither(g,sx,42,6,90,'#0d1a26',(u,v)=>.55*(1-v)*(1-Math.abs(u-.5)*1.6));}
+  dither(g,0,150,W,50,'#0a1520',(u,v)=>v*.85);
+  // Neon stripe with a soft glow.
+  g.globalAlpha=.18;g.fillStyle='#ff3d8b';g.fillRect(0,110,W,18);g.globalAlpha=1;
+  g.fillStyle='#ff3d8b';g.fillRect(0,116,W,6);g.fillStyle='#ffc2dc';g.fillRect(0,116,W,1);g.fillStyle='#41e3ff';g.fillRect(0,126,W,2);
+  // Poster (peeling corner) and an ad.
+  function poster(x,y,bg,bands,title,sub){g.fillStyle='#05080f';g.fillRect(x-2,y-2,100,62);bands.forEach((c,i)=>{g.fillStyle=c;g.fillRect(x,y+i*Math.ceil(58/bands.length),96,Math.ceil(58/bands.length));});
+    g.fillStyle=bg;g.fillRect(x+30,y+18,10,26);g.fillRect(x+27,y+24,16,4);g.fillRect(x+31,y+12,8,7);g.fillRect(x+40,y+22,14,3);
+    g.textAlign='center';g.font='italic 900 15px Impact, sans-serif';g.fillStyle='#05080f';g.fillText(title,x+49,y+51);g.fillStyle='#ffffff';g.fillText(title,x+48,y+50);g.font='bold 7px monospace';g.fillStyle='#ffe08a';g.fillText(sub,x+66,y+14);
+    g.fillStyle=tones[2];g.beginPath();g.moveTo(x+96,y);g.lineTo(x+80,y);g.lineTo(x+96,y+12);g.fill();g.fillStyle='#c9b7a3';g.beginPath();g.moveTo(x+80,y);g.lineTo(x+96,y+12);g.lineTo(x+84,y+10);g.fill();}
+  poster(36,48,'#05080f',['#ff7a2f','#ff4f6d','#a13a8f','#3d1d6e'],'NEON RUMBLE','LIVE');
+  poster(508,48,'#05080f',['#b6ff4a','#43c46f','#1f7a6a','#123a4f'],'FIGHT CLUB','FRI');
+  // Route map.
+  g.fillStyle='#05080f';g.fillRect(166,46,144,62);g.fillStyle='#cfd9e2';g.fillRect(168,48,140,58);g.fillStyle='#16357a';g.fillRect(168,48,140,10);
+  g.fillStyle='#ffffff';g.font='bold 7px monospace';g.textAlign='left';g.fillText('NIGHTLINE NETWORK',172,56);
+  for(const [y,col,pts] of [[70,'#ff3d8b',[176,206,236,268,298]],[82,'#1fa8d6',[176,214,254,298]],[94,'#58b82a',[190,232,262,292]]]){g.fillStyle=col;g.fillRect(pts[0],y-1,pts.at(-1)-pts[0],3);for(const p of pts){g.fillStyle='#05080f';g.fillRect(p-2,y-3,5,7);g.fillStyle='#ffffff';g.fillRect(p-1,y-2,3,5);}}
+  // Station clock and a CCTV camera.
+  g.fillStyle='#05080f';g.beginPath();g.arc(392,74,19,0,TAU);g.fill();g.fillStyle='#e9eef2';g.beginPath();g.arc(392,74,16,0,TAU);g.fill();
+  for(let i=0;i<12;i++){const a=i*TAU/12;g.fillStyle='#2a3140';g.fillRect(Math.round(392+Math.cos(a)*13),Math.round(74+Math.sin(a)*13),1,1);}
+  g.fillStyle='#16202e';g.fillRect(391,63,2,12);g.fillRect(392,73,8,2);g.fillStyle='#ff3d8b';g.fillRect(392,74,1,1);
+  g.fillStyle='#05080f';g.fillRect(452,46,22,12);g.fillStyle='#2a3140';g.fillRect(453,47,16,9);g.fillStyle='#41e3ff';g.fillRect(466,50,3,3);g.fillStyle='#1a2232';g.fillRect(470,44,3,6);
+  // Platform-number lightbox.
+  g.fillStyle='#05080f';g.fillRect(206,136,228,28);g.fillStyle='#16357a';g.fillRect(208,138,224,24);g.fillStyle='#2a4fa8';g.fillRect(208,138,224,2);
+  g.fillStyle='#ffffff';g.font='bold 11px monospace';g.textAlign='center';g.fillText('NIGHTLINE · PLATFORM 3',320,154);
+  // Graffiti low on the wall.
+  // Spray-painted tags: outlined letters with paint drips.
+  for(const [x,y,txt,col,rot,seed] of [[78,190,'K1TE','#b6ff4a',-.09,3],[286,192,'RMBL 7','#ff3d8b',.05,9],[468,189,'BR!CK','#41e3ff',-.06,17]]){
+    g.save();g.translate(x,y);g.rotate(rot);g.globalAlpha=.88;g.font='italic 900 17px Impact, sans-serif';g.textAlign='left';g.lineJoin='round';
+    g.lineWidth=4;g.strokeStyle='#05080f';g.strokeText(txt,0,0);g.lineWidth=2;g.strokeStyle='#ffffff';g.strokeText(txt,0,0);g.fillStyle=col;g.fillText(txt,0,0);
+    const w=g.measureText(txt).width;g.fillStyle=col;for(let i=0;i<5;i++){const dx=Math.round(4+rnd(seed+i)*(w-8));g.fillRect(dx,1,1,3+Math.round(rnd(seed*3+i)*7));}
+    g.restore();}
+  g.globalAlpha=1;
+  // Track pit: back lip, gravel ballast, sleepers, rails, third rail, a puddle.
+  g.fillStyle='#05080f';g.fillRect(0,198,W,46);g.fillStyle='#0d1320';g.fillRect(0,200,W,4);
+  dither(g,0,204,W,40,'#141a26',(u,v,x,y)=>.35+.4*rnd(x*3+y*7));dither(g,0,204,W,40,'#1e2533',(u,v,x,y)=>.18*rnd(x*11+y*5));
+  for(let x=0;x<W;x+=16){g.fillStyle='#1a1410';g.fillRect(x,230,11,7);g.fillStyle='#2a2018';g.fillRect(x,230,11,1);}
+  for(const y of [226,235]){g.fillStyle='#2a303c';g.fillRect(0,y,W,3);g.fillStyle='#8b93a3';g.fillRect(0,y,W,1);}
+  g.fillStyle='#c9a227';g.fillRect(0,218,W,3);for(let x=6;x<W;x+=48){g.fillStyle='#3a2c10';g.fillRect(x,221,3,4);}
+  g.fillStyle='#0c1626';g.fillRect(296,239,96,4);g.fillStyle='#18304a';g.fillRect(300,239,88,1);
 }
 function paintSubwayFront(g){
-  // Pillars stand on the platform, in front of passing trains.
-  for(const x of [6,608]){g.fillStyle='#05080f';g.fillRect(x-2,36,30,206);g.fillStyle='#2a3e55';g.fillRect(x,36,26,206);g.fillStyle='#3f5a78';g.fillRect(x,36,4,206);g.fillStyle='#ff3d8b';g.fillRect(x,118,26,7);
-    g.fillStyle='#16357a';g.fillRect(x+3,150,20,14);g.fillStyle='#fff';g.font='bold 9px monospace';g.textAlign='center';g.fillText('3',x+13,161);}
-  // Platform edge: yellow safety strip with tactile bumps, then the tiled floor.
-  g.fillStyle='#05080f';g.fillRect(0,240,W,2);g.fillStyle='#ffcc33';g.fillRect(0,242,W,8);
-  for(let x=2;x<W;x+=6){g.fillStyle='#b88f17';g.fillRect(x,244,2,2);g.fillRect(x+3,247,2,2);}
-  g.fillStyle='#34465a';g.fillRect(0,250,W,110);
-  const rows=[250,262,277,296,320,350,360];
-  for(let i=0;i<rows.length-1;i++){const y=rows[i],h=rows[i+1]-y,tw=24+i*10;g.fillStyle='#2a3a4c';g.fillRect(0,y,W,1);for(let x=(i%2)*tw/2;x<W;x+=tw)g.fillRect(Math.round(x),y,1,h);}
-  // Polished floor: soft reflections of the ceiling tubes.
-  for(const x of [40,200,360,520])for(let i=0;i<6;i++){g.globalAlpha=.07*(1-i/6);g.fillStyle='#e6f3ff';g.fillRect(x+28,252+i*18,24,18);}g.globalAlpha=1;
+  // Pillars with rust streaks.
+  for(const x of [0,614]){g.fillStyle='#05080f';g.fillRect(x-1,42,28,206);g.fillStyle='#2a3e55';g.fillRect(x,42,26,206);g.fillStyle='#3f5a78';g.fillRect(x+(x?0:22),42,4,206);
+    for(let y=48;y<246;y+=12){g.fillStyle='#22344a';g.fillRect(x,y,26,1);}
+    dither(g,x+6,60,8,150,'#5a3418',(u,v)=>.45*(1-v)*(1-Math.abs(u-.5)*2));g.fillStyle='#ff3d8b';g.fillRect(x,116,26,6);
+    g.fillStyle='#16357a';g.fillRect(x+4,150,18,14);g.fillStyle='#fff';g.font='bold 9px monospace';g.textAlign='center';g.fillText('3',x+13,161);}
+  // Bench and trash bin on the left; a glowing drinks machine on the right.
+  g.fillStyle='#05080f';g.fillRect(36,232,74,6);g.fillStyle='#5a3d26';g.fillRect(37,233,72,4);g.fillStyle='#7a5636';g.fillRect(37,233,72,1);
+  for(const x of [42,100]){g.fillStyle='#1a2232';g.fillRect(x,237,3,13);}
+  g.fillStyle='#05080f';g.fillRect(118,228,18,22);g.fillStyle='#2f4a3a';g.fillRect(119,229,16,20);g.fillStyle='#476b55';g.fillRect(119,229,16,2);g.fillStyle='#ffcc33';g.fillRect(124,236,6,3);
+  g.fillStyle='#05080f';g.fillRect(546,182,46,68);g.fillStyle='#2b0f2a';g.fillRect(547,183,44,66);g.fillStyle='#ff3d8b';g.fillRect(547,183,44,3);
+  g.fillStyle='#ffd1e6';g.fillRect(551,190,26,40);for(let r=0;r<5;r++)for(let k=0;k<4;k++){g.fillStyle=['#ff3d8b','#41e3ff','#b6ff4a','#ffcc33'][(r+k)%4];g.fillRect(553+k*6,192+r*8,4,6);}
+  g.fillStyle='#120610';g.fillRect(581,192,7,22);g.fillStyle='#41e3ff';g.fillRect(583,195,3,2);g.fillStyle='#ffcc33';g.fillRect(583,200,3,2);g.fillStyle='#05080f';g.fillRect(551,236,36,8);
+  // Platform edge: safety strip with tactile bumps.
+  g.fillStyle='#05080f';g.fillRect(0,244,W,2);g.fillStyle='#ffcc33';g.fillRect(0,246,W,8);for(let x=2;x<W;x+=6){g.fillStyle='#b88f17';g.fillRect(x,248,2,2);g.fillRect(x+3,251,2,2);}
+  // Tiled platform floor with perspective rows, colour variation, grime and puddles.
+  const rows=[254,265,279,297,318];
+  for(let i=0;i<rows.length-1;i++){const y=rows[i],h=rows[i+1]-y,tw=26+i*12;for(let x=(i%2)*tw/2-tw,k=0;x<W;x+=tw,k++){const c=['#33465a','#2f4155','#36495e','#2c3e52'][Math.floor(rnd(i*31+k)*4)];g.fillStyle=c;g.fillRect(Math.round(x)+1,y+1,Math.round(tw)-1,h-1);g.fillStyle=shade(c,.12);g.fillRect(Math.round(x)+1,y+1,Math.round(tw)-1,1);}
+    g.fillStyle='#1d2a39';g.fillRect(0,y,W,1);}
+  dither(g,0,254,W,64,'#1d2a39',(u,v,x,y)=>.22*rnd(x*13+y*3)+.25*Math.max(0,Math.abs(u-.5)*2-.6));
+  for(const [x,w] of [[150,64],[452,72]]){g.fillStyle='#1b2a40';g.fillRect(x,302,w,6);g.fillRect(x+4,301,w-8,8);g.fillStyle='#41e3ff';g.globalAlpha=.35;g.fillRect(x+8,304,w-20,1);g.globalAlpha=1;}
+  // Front lip with amber lights.
+  g.fillStyle='#05080f';g.fillRect(0,318,W,42);g.fillStyle='#1a2534';g.fillRect(0,318,W,2);g.fillStyle='#0b111b';g.fillRect(0,320,W,40);
+  for(let x=36;x<W;x+=80){g.fillStyle='#3a2408';g.fillRect(x-3,331,10,6);g.fillStyle='#ffb04a';g.fillRect(x-1,332,6,3);}
 }
-function drawSubwayLife(c,t){
-  // A train blasts through every 13 s; its headlight glow sweeps the wall just before it arrives.
+function drawSubwayBackLife(c,t){
+  // Train: headlight glow sweeps the wall, then five lit cars blast through the track lane.
   const period=13000,ph=t%period,run=1300,lead=500;
-  if(ph<lead){c.save();c.globalCompositeOperation='lighter';c.globalAlpha=ph/lead*.25;c.fillStyle='#fff3c4';c.fillRect(W-200*(ph/lead),150,200*(ph/lead),88);c.restore();}
-  else if(ph<lead+run){const k=(ph-lead)/run,len=1000,x0=Math.round(W+20-k*(W+len+40));c.save();c.beginPath();c.rect(0,140,W,100);c.clip();
+  if(ph<lead){c.save();c.globalCompositeOperation='lighter';c.globalAlpha=ph/lead*.25;c.fillStyle='#fff3c4';c.fillRect(W-200*(ph/lead),150,200*(ph/lead),92);c.restore();}
+  else if(ph<lead+run){const k=(ph-lead)/run,len=1000,x0=Math.round(W+20-k*(W+len+40));c.save();c.beginPath();c.rect(0,140,W,104);c.clip();
     for(let car=0;car<5;car++){const x=x0+car*200;if(x>W||x+196<0)continue;
-      c.fillStyle='#05080f';c.fillRect(x-1,153,198,82);c.fillStyle='#c9d3df';c.fillRect(x,154,196,78);c.fillStyle='#e8eef5';c.fillRect(x,154,196,4);
+      c.fillStyle='#05080f';c.fillRect(x-1,153,198,86);c.fillStyle='#b9c4d2';c.fillRect(x,154,196,82);c.fillStyle='#e8eef5';c.fillRect(x,154,196,4);c.fillStyle='#8e9aab';c.fillRect(x,226,196,10);
       c.fillStyle='#ffe7a8';c.fillRect(x+8,166,180,26);for(let w=0;w<9;w++){c.fillStyle='#4b4f5a';c.fillRect(x+8+w*20,166,2,26);}
-      c.fillStyle='#ff3d8b';c.fillRect(x,198,196,6);c.fillStyle='#8a96a6';c.fillRect(x+90,206,16,26);}
+      c.fillStyle='#ff3d8b';c.fillRect(x,198,196,6);c.fillStyle='#6f7b8c';c.fillRect(x+88,206,20,20);c.fillStyle='#05080f';c.fillRect(x+97,206,2,20);}
     c.globalAlpha=.35;c.fillStyle='#ffffff';for(let i=0;i<10;i++)c.fillRect(0,158+i*8,W,1);c.restore();}
-  // One tube flickers now and then.
-  if(hash(Math.floor(t/90))<.05){c.fillStyle='#0a0e18';c.fillRect(360,21,80,4);}
+  // The track puddle shimmers with the neon above it.
+  for(let i=0;i<5;i++){const x=Math.round(304+((t*.02+i*19)%80));c.globalAlpha=.45;c.fillStyle=i%2?'#ff3d8b':'#41e3ff';c.fillRect(x,240,4,1);}c.globalAlpha=1;
+  // Every 21 s a rat scurries along the rail.
+  const rp=t%21000;if(rp<2600){const x=Math.round(-20+rp/2600*(W+40)),bob=Math.floor(t/60)%2;c.fillStyle='#05080f';c.fillRect(x-1,221+bob,9,5);c.fillStyle='#4a423c';c.fillRect(x,222+bob,7,3);c.fillStyle='#8a7b70';c.fillRect(x+6,222+bob,2,1);c.fillStyle='#2b2521';c.fillRect(x-6,224,6,1);}
+}
+function drawSubwayFrontLife(c,t){
+  c.save();c.globalCompositeOperation='lighter';
+  // Light cones under the tubes, with dust drifting through them; one tube flickers now and then.
+  const flick=hash(Math.floor(t/90))<.05;
+  TUBES.forEach((x,i)=>{if(flick&&i===2)return;c.globalAlpha=.045;c.fillStyle='#bfe4ff';c.beginPath();c.moveTo(x+4,34);c.lineTo(x+68,34);c.lineTo(x+110,246);c.lineTo(x-38,246);c.closePath();c.fill();
+    for(let k=0;k<6;k++){const ph=((t*.00004+k*.17+i*.31)%1);c.globalAlpha=.35*(1-Math.abs(ph-.5)*2);c.fillStyle='#ffffff';c.fillRect(Math.round(x+10+hash(k+i*7)*50+Math.sin(t/900+k)*6),Math.round(40+ph*190),1,1);}});
+  // Vending machine glow.
+  c.globalAlpha=.08+.03*Math.sin(t/400);c.fillStyle='#ff3d8b';c.fillRect(536,176,66,80);
+  // Front lip lights breathe.
+  for(let x=36,i=0;x<W;x+=80,i++){c.globalAlpha=.22+.18*Math.sin(t/700+i);c.fillStyle='#ffb04a';c.fillRect(x-5,329,14,10);}
+  c.restore();
+  if(flick){c.fillStyle='#0a0e18';c.fillRect(379,30,66,3);}
+  // Drips from the ceiling land in the platform puddles and ripple.
+  for(const [x,y,off] of [[180,304,0],[488,304,900]]){const ph=(t+off)%1700;
+    if(ph<620){const k=ph/620;c.fillStyle='#a9d0ff';c.globalAlpha=.8;c.fillRect(x,Math.round(36+k*k*(y-36)),1,3);}
+    else if(ph<1220){const k=(ph-620)/600;c.globalAlpha=(1-k)*.7;c.strokeStyle='#a9d0ff';c.lineWidth=1;c.beginPath();c.ellipse(x+.5,y+.5,2+k*16,1+k*3,0,0,TAU);c.stroke();}}
+  c.globalAlpha=1;
+  // Steam rising out of the track by the left pillar.
+  for(let i=0;i<10;i++){const ph=((t*.00025+i*.1)%1),x=60+Math.sin(ph*6+i)*8+i%3*6,y=240-ph*90;c.globalAlpha=(1-ph)*.18;c.fillStyle='#d9e6f2';c.fillRect(Math.round(x),Math.round(y),6+Math.round(ph*8),4+Math.round(ph*4));}
+  c.globalAlpha=1;
 }
 export const FX_COLOR={kite:'#ffb03a',rook:'#6dfff2',brick:'#b6ff4a'};
 const hash=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
@@ -309,7 +385,7 @@ export class Renderer{
     c.fillStyle='#0b1d32';c.fillRect(focusX-W,focusY-H,W*2,H*2);const stageId=menu?'rooftop':s.stage??'rooftop',stage=this.stageLayer(stageId);
     // Smooth only the backdrop: it is a downscaled painting, and nearest-neighbour makes it shimmer as the camera moves.
     if(stage){c.imageSmoothingEnabled=true;c.drawImage(stage,0,0);c.imageSmoothingEnabled=false;}
-    if(stageId==='subway'){drawSubwayLife(c,t);c.drawImage(this.subway.front,0,0);}else drawSigns(c,t);
+    if(stageId==='subway'){drawSubwayBackLife(c,t);c.drawImage(this.subway.front,0,0);drawSubwayFrontLife(c,t);}else drawSigns(c,t);
     // Low-key city animation and drifting rooftop dust.
     c.globalAlpha=.3;for(let i=0;i<13;i++){const x=(i*63+t*.007)%W,y=170+(i*23)%120;c.fillStyle=i%2?'#a4c8e0':'#ffbb75';c.fillRect(Math.floor(x),Math.floor(y+Math.sin(t/800+i)*3),1,1);}c.globalAlpha=1;
     const fighters=live;
