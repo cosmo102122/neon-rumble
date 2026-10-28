@@ -155,3 +155,10 @@ test('training mode: no clock or KO, health refills after a combo, meters stay f
   assert.equal(s.fighters[0].meter,100);
   assert.equal(s.timer,60*60);
 });
+
+test("Kite's slide passes under Rook's pulse", () => {
+  const s = createMatch(['kite','rook']); s.phase='fight'; s.fighters[0].x=150; s.fighters[1].x=420;
+  step(s,[0,B.special]); for(let i=0;i<24;i++)step(s,[0,0]);
+  s.fighters[0].x = s.projectiles[0].x-60; step(s,[B.right|B.special,0]);
+  for(let i=0;i<14;i++){step(s,[0,0]);assert.equal(s.fighters[0].stun,0);}
+});

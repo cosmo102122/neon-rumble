@@ -1,16 +1,20 @@
-import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261027-04';
-import {OpponentAI} from './shared/ai.mjs?v=20261027-04';
-import {Renderer} from './render.mjs?v=20261027-04';
+import {B,createMatch,step,clone,FIGHTERS} from './shared/engine.mjs?v=20261028-01';
+import {OpponentAI} from './shared/ai.mjs?v=20261028-01';
+import {Renderer} from './render.mjs?v=20261028-01';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),renderer=new Renderer($('game')),sound=new Sound();
-$('game').dataset.version='20261027-04';
+$('game').dataset.version='20261028-01';
 const DEFAULTS={left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',dash:'ShiftLeft',light:'KeyJ',heavy:'KeyK',special:'KeyL',block:'KeyI',super:'KeyU',ex:'KeyO'};
 // One-press shortcuts for the two-button meter moves.
-const COMBO={super:B.heavy|B.special,ex:B.light|B.special};
+const COMBO={super:B.heavy|B.special,ex:B.light|B.special},COMBO_COST={super:100,ex:50};
+// The shortcut keys only fire when your bar can pay for the move (otherwise they'd fall back to a plain special).
+const canAfford=name=>!COMBO_COST[name]||(confirmed?.fighters?.[myIndex]?.meter??0)>=COMBO_COST[name];
 const LABELS={left:'Move left',right:'Move right',jump:'Jump',crouch:'Crouch',dash:'Dash',light:'Light',heavy:'Heavy',special:'Special',block:'Block',super:'Super (full bar)',ex:'EX special (half bar)'};
 function stored(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
 function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
 let bindings={...DEFAULTS,...stored('nr-keys',{})},held=new Set(),tapMask=0,listening=null,selected=stored('nr-fighter','kite');if(!FIGHTERS[selected])selected='kite';
+// Returning players: the new default keys must not collide with bindings saved before they existed.
+for(const k of ['super','ex'])if(Object.entries(bindings).some(([n,c])=>n!==k&&c===bindings[k]))bindings[k]='';
 const DUMMY_MODES=['STAND','BLOCK','CROUCH BLOCK','JUMP'];let training=false,dummyMode=0,showBoxes=false;
 let mode='menu',state=createMatch([selected,'rook']),confirmed=state,ai=null,socket=null,room=null,myIndex=0,seq=0,pending=[],lastServerInputs=[0,0],networkPause=false,reconnecting=false,reconnectDeadline=0,lastSnapshot=0,serverReady=false,lastHud='',lastMatchShown=0,connectionGeneration=0;
 let serverBase=stored('nr-server','');const params=new URLSearchParams(location.search);const embedded=window.self!==window.top||params.get('embed')==='1';if(embedded)document.documentElement.classList.add('embedded');const suppliedServer=params.get('server');
@@ -20,11 +24,11 @@ let savedSession;try{savedSession=JSON.parse(sessionStorage.getItem('nr-session'
 function session(value){savedSession=value;try{value?sessionStorage.setItem('nr-session',JSON.stringify(value)):sessionStorage.removeItem('nr-session');}catch{}}
 function show(id,visible){$(id).classList.toggle('hidden',!visible);}
 function notice(text){$('notice').textContent=text;show('notice',!!text);}
-function label(code){return code.replace(/^Key|^Digit/,'').replace('ShiftLeft','SHIFT').replace('ShiftRight','RSHIFT').replace('Arrow','').replace('Space','SPACE');}
+function label(code){return (code||'—').replace(/^Key|^Digit/,'').replace('ShiftLeft','SHIFT').replace('ShiftRight','RSHIFT').replace('Arrow','').replace('Space','SPACE');}
 // Always-on alternates alongside the rebindable keys: Space and the arrow keys.
 const EXTRA={Space:'jump',ArrowUp:'jump',ArrowDown:'crouch',ArrowLeft:'left',ArrowRight:'right'};
 const isGameKey=code=>Object.values(bindings).includes(code)||code in EXTRA;
-function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=(B[name]??COMBO[name]);for(const [code,name]of Object.entries(EXTRA))if(held.has(code))m|=(B[name]??COMBO[name]);return m;}
+function mask(){let m=tapMask;tapMask=0;for(const [name,code]of Object.entries(bindings))if(held.has(code))m|=(B[name]??(canAfford(name)?COMBO[name]:0));for(const [code,name]of Object.entries(EXTRA))if(held.has(code))m|=(B[name]??(canAfford(name)?COMBO[name]:0));return m;}
 function clearInput(){held.clear();tapMask=0;if(socket?.readyState===1&&room)send({type:'input',seq:++seq,mask:0});}
 function send(data){if(socket?.readyState===1)socket.send(JSON.stringify(data));}
 function unlock(){sound.unlock();}document.addEventListener('pointerdown',unlock,{once:true});
@@ -33,7 +37,7 @@ document.addEventListener('keydown',e=>{
     const other=Object.keys(bindings).find(k=>bindings[k]===e.code);if(other)bindings[other]=bindings[listening];bindings[listening]=e.code;listening=null;save('nr-keys',bindings);renderBindings();renderControls();notice('');return;}
   if(e.target.matches('input,select,textarea')||document.querySelector('dialog[open]'))return;
   if(training&&mode==='ai'&&e.code==='KeyR'&&!Object.values(bindings).includes('KeyR')){e.preventDefault();startAI(true);return;}
-  if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=(B[k]??COMBO[k]);if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
+  if((mode==='online'||mode==='ai')&&isGameKey(e.code)){e.preventDefault();sound.unlock();if(!held.has(e.code)){for(const [k,v]of Object.entries(bindings))if(v===e.code)tapMask|=(B[k]??(canAfford(k)?COMBO[k]:0));if(EXTRA[e.code])tapMask|=B[EXTRA[e.code]];}held.add(e.code);}
 });
 document.addEventListener('keyup',e=>held.delete(e.code));window.addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
 function choose(id){selected=id;save('nr-fighter',id);document.querySelectorAll('[data-fighter]').forEach(b=>{const yes=b.dataset.fighter===id;b.classList.toggle('selected',yes);b.setAttribute('aria-pressed',yes);});$('fighterCaption').replaceChildren();const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=FIGHTERS[id].name;small.textContent=FIGHTERS[id].title.toUpperCase();$('fighterCaption').append(strong,small);document.querySelector('.stage-caption-number').textContent=id==='kite'?'01 / 02':'02 / 02';}
@@ -95,7 +99,7 @@ $('sound').onclick=()=>{sound.unlock();sound.enabled=!sound.enabled;$('sound').t
 $('fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen?.();else $('screen').requestFullscreen?.().catch(()=>notice('Full screen is unavailable in this browser.'));};
 for(const id of ['help','comboHelp'])$(id).onclick=()=>{clearInput();$('helpDialog').showModal();};document.querySelectorAll('.dialog-close,.dialog-done').forEach(b=>b.onclick=()=>{b.closest('dialog').close();listening=null;});
 function renderBindings(){$('bindings').replaceChildren();for(const [name,code]of Object.entries(bindings)){const button=document.createElement('button');button.className='binding'+(listening===name?' listening':'');const k=document.createElement('kbd');k.textContent=listening===name?'PRESS KEY':label(code);button.append(document.createTextNode(LABELS[name]),k);button.onclick=()=>{listening=name;renderBindings();};$('bindings').append(button);}}
-function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block'],['super']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block','Super'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');}
+function renderControls(){const groups=[['left','right'],['jump'],['crouch'],['dash'],['light'],['heavy'],['special'],['block'],['super']];const names=['Move','Jump','Crouch','Dash','Light','Heavy','Special','Block','Super'];$('controls').querySelectorAll('div').forEach(d=>d.remove());groups.forEach((g,i)=>{const d=document.createElement('div'),keys=document.createElement('span');keys.className='keys';for(const name of g){const k=document.createElement('kbd');k.textContent=label(bindings[name]);keys.append(k);}d.append(keys,document.createTextNode(names[i]));$('controls').insertBefore(d,$('rebind'));});$('comboKeys').textContent=['light','light','heavy','jump','light','heavy','special'].map(name=>label(bindings[name])).join(' → ');guideMode='';lastHud='';}
 // The strip under the arena teaches the combo, and switches to the meter moves when your bar is ready.
 let guideMode='';function setGuide(m){if(m===guideMode)return;guideMode=m;const g=document.querySelector('.combo-guide strong');
   if(m==='super'){g.textContent='SUPER READY';$('comboKeys').textContent=`Press ${label(bindings.super)}  ·  or ${label(bindings.heavy)} + ${label(bindings.special)} together`;}

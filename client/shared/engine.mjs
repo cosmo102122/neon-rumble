@@ -59,7 +59,10 @@ export function createMatch(ids=['kite','kite'], options={}) {
 }
 function emit(s,type,data={}) {s.events.push({id:++s.eventId,tick:s.tick,type,...data});if(s.events.length>36)s.events.shift();}
 const gain=(f,n)=>{f.meter=Math.min(METER_MAX,f.meter+n);};
-export function hurtbox(f) {const crouch=f.y===0&&(f.state==='crouch'||f.state==='blockLow'||f.move==='low'||f.move==='specialFwd'&&f.id==='kite');return{x:f.x-12,y:FLOOR-f.y-(crouch?39:65),w:24,h:crouch?39:65};}
+export function hurtbox(f) {
+  // Kite's slide is low enough to pass under pulses (their box bottoms out 31px above the floor).
+  if(f.y===0&&f.id==='kite'&&f.move==='specialFwd')return{x:f.x-14,y:FLOOR-22,w:28,h:22};
+  const crouch=f.y===0&&(f.state==='crouch'||f.state==='blockLow'||f.move==='low');return{x:f.x-12,y:FLOOR-f.y-(crouch?39:65),w:24,h:crouch?39:65};}
 export function hitbox(f) {
   const m=FIGHTERS[f.id].moves[f.move];
   if(!m||m.projectile||f.mf<m.startup||f.mf>=m.startup+m.active)return null;
@@ -149,7 +152,7 @@ function updateFighter(s,f,o,mask,pressed) {
     if(cur?.projectile&&f.mf===cur.startup){
       const low=!!cur.low;
       s.projectiles.push({id:++s.eventId,owner:s.fighters.indexOf(f),x:f.x+f.face*(cur.kind==='beam'?40:25),y:low?FLOOR-7:FLOOR-f.y-39,vx:f.face*(cur.speed??4.9),life:150,
-        damage:cur.damage,stun:cur.stun,blockstun:cur.blockstun,kb:cur.kb,low,chip:cur.chip??0,pw:cur.pw??16,ph:cur.ph??16,kind:cur.kind??'pulse',super:f.move==='super'});
+        damage:cur.damage,stun:cur.stun,blockstun:cur.blockstun,kb:cur.kb,low,chip:cur.chip??0,pw:cur.pw??16,ph:cur.ph??16,kind:cur.kind??'pulse',super:f.move==='super',ex:f.move==='exSpecial'});
       emit(s,'pulse',{p:s.fighters.indexOf(f),kind:cur.kind??'pulse'});
     }
   }else if(f.dash>0){f.dash--;f.state='dash';f.x+=f.face*(f.dashDir>0?5.5:-4.6);}
@@ -216,11 +219,13 @@ function applyHit(s,attackerIndex,defenderIndex,m,originX) {
     if(m.juggleY>0)d.vy=Math.max(d.vy,m.juggleY);
     else d.vy=Math.min(d.vy,m.juggleY);
   }
-  if(d.hp<=0){d.y=Math.max(d.y,.01);d.vy=Math.max(d.vy,5);d.vx*=1.8;}
-  if(!isSuper&&a.move!=="exSpecial")gain(a,damage*.08);
+  const ko=d.hp<=0&&!s.training;
+  if(ko){d.y=Math.max(d.y,.01);d.vy=Math.max(d.vy,5);d.vx*=1.8;}
+  // Meter moves never refund meter (m.ex marks an EX projectile that lands after Rook has recovered).
+  if(!isSuper&&!m.ex&&a.move!=="exSpecial")gain(a,damage*.08);
   gain(d,damage*.05);
   a.connected=true;a.combo=combo;a.comboAge=80;s.hitstop=Math.max(s.hitstop,isSuper?14:m.finisher?8:m.damage>=100?6:4);
-  emit(s,'hit',{p:defenderIndex,by:attackerIndex,damage,combo,x:d.x,y:FLOOR-d.y-40,heavy:m.damage>=100,airborne:d.y>0,finisher:!!m.finisher||!!isSuper,super:!!isSuper,ko:d.hp<=0});
+  emit(s,'hit',{p:defenderIndex,by:attackerIndex,damage,combo,x:d.x,y:FLOOR-d.y-40,heavy:m.damage>=100,airborne:d.y>0,finisher:!!m.finisher||!!isSuper,super:!!isSuper,ko});
 }
 function holdInputs(s,masks,pressed){
   s.fighters.forEach((f,i)=>{if(pressed[i]&ATK){f.buffer=(f.bufferAge>=8?f.buffer:0)|(pressed[i]&ATK);f.bufferAge=10;}if(pressed[i]&B.jump)f.jumpBufferAge=10;f.prev=masks[i];});
